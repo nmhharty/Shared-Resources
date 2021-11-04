@@ -1,0 +1,201 @@
+---
+title: "Schools"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Schools  
+
+### Cases  
+```{r label=CasesUnder20}
+ConfProbCases %>%
+  filter(AgeGrouping %in% c("0-9", "10-19"), AttributionDate<=(params$DataThroughDate)) %>%
+  group_by(AgeGrouping) %>%
+  summarise(NumberCases = n()) %>%
+  arrange(AgeGrouping) %>%
+  mutate(PercentAllCases=round((NumberCases/(ConfProbCases %>%
+                                        filter(AgeGrouping %in% c("0-9", "10-19"), AttributionDate<=(params$DataThroughDate)) %>%
+                                        count() %>%
+                                        pull()))*100,2),
+         text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PercentAllCases,"<br>Case Count: ",NumberCases)) %>%
+plot_ly(x = ~AgeGrouping,
+  y = ~PercentAllCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "All Cases",
+  text = ~text,
+  hoverinfo = "text") %>%
+  add_trace(data = data.frame(Pop=c(2603,3195), 
+                              AgeGrouping=as.factor(c("0-9","10-19"))) %>%
+              mutate(PopPercent=round((Pop/5798)*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PopPercent,"<br>Case Count: ",Pop)),
+            x = ~AgeGrouping,
+            y = ~PopPercent,
+            type = "bar",
+            color = I("#4E2B1F"),
+            name = "Routt County Population",
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  add_trace(data = ConfProbCases %>%
+              filter(
+                IsMostRecent2WeeksRolling=="Yes") %>%
+              group_by(AgeGrouping) %>%
+              summarise(NumberCases2Weeks = n()) %>%
+              right_join(data.frame(AgeGrouping=
+                                      c("0-9", "10-19")),
+                         by = c("AgeGrouping")) %>%
+              group_by(AgeGrouping) %>%
+              replace(., is.na(.), 0) %>%
+              arrange(AgeGrouping) %>%
+              mutate(Percent2WeekCases=round((NumberCases2Weeks/(ConfProbCases %>%
+                                                                   filter(IsMostRecent2WeeksRolling=="Yes") %>%
+                                                                   count() %>%
+                                                                   pull()))*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",Percent2WeekCases,"<br>Case Count: ",NumberCases2Weeks)),
+            x = ~AgeGrouping,
+            y = ~Percent2WeekCases,
+            type = "bar",
+            name = "Most Recent Two Weeks' Cases",
+            color = I("#477691"),
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Age Distribution Cases Age 0-19 and Most Recent \n Two Weeks' Cases Compared to Routt County Population",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+```
+
+```{r label=CasesUnder20Table}
+ConfProbCases %>%
+  filter(Age<18, AttributionDate<=(params$DataThroughDate)) %>%
+  mutate(DxTimeCat = case_when(AttributionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                               TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+  group_by(AgeGrouping, DxTimeCat) %>%
+  summarise(NumberCases = n()) %>%
+  mutate("Age Group" = case_when(AgeGrouping=="0-9" ~ "0-9",
+                                 TRUE ~ as.character("10-17"))) %>%
+  ungroup() %>%
+  select("Age Group", "Positive Test Time Frame" = DxTimeCat, "Number of Cases" = NumberCases) %>%
+  kable(caption = "Number of Cases Before and After Start of Academic Year, by Age Group")
+```
+
+Incidence Rate is grouped by age category of under 20 and all cases because we do not have population estimate for just under 18 years old for Routt County.
+  
+```{r label = incidence}
+ConfProbCases %>%
+  filter(Age<19) %>%
+  summarise(cases = n()) %>%
+  mutate(AgeGroup = "Under19", 
+         Pop = RouttPopTable2 %>%
+                  filter(AGE<19) %>%
+                  summarise(Sum = sum(TOTAL)) %>%
+                  pull(Sum), 
+         Incidence = round((cases/Pop*1000),2)) %>%
+  select(-cases) %>%
+  rbind(ConfProbCases %>%
+              summarise(cases = n()) %>%
+              mutate(AgeGroup = "All", Pop = params$RouttPop, Incidence = round((cases/Pop*1000),2)) %>%
+              select(-cases)) %>%
+  kable(caption = "Incidence Rate by Age Group")
+```
+
+### Tests  
+
+```{r label=tests0to17}
+NonAntibodyTests %>%
+  filter(AgeAtCollection<18, CollectionDate<=(params$DataThroughDate)) %>%
+  mutate(TestTimeCat = case_when(CollectionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                               TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+  group_by(CollectionWeekStart) %>%
+  summarise(Count = n()) %>%
+plot_ly(
+  x = ~CollectionWeekStart,
+  y = ~Count,
+  name = "Tests",
+  type = "bar",
+  marker = list(color = "#BB4628")) %>%
+add_trace(data = ConfProbCases %>%
+            filter(Age<18, AttributionDate<=(params$DataThroughDate)) %>%
+            mutate(DxTimeCat = case_when(AttributionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                                         TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+            group_by(AttributionWeekStart) %>%
+            summarise(NumberCases = n()),
+  x = ~AttributionWeekStart,
+            y = ~NumberCases,
+            name = "Cases",
+            type = "bar",
+            marker = list(color = "#4E2B1F")) %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      tickangle = 45,
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+       yaxis = list(title = "Number of Tests",
+                    rangemode = "tozero",
+                    dtick = 25),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+```
+
+```{r label=YouthPositivity}
+ConfProbCases %>%
+  filter(Age<18) %>%
+  filter(AgeGrouping %in% c("0-9", "10-19")) %>%
+  group_by(AgeGrouping, AttributionWeekStart) %>%
+  summarise(Cases = n()) %>%
+  left_join(NonAntibodyTests %>%
+              filter(AgeAtCollection<18) %>%
+              filter(AgeGrouping %in% c("0-9", "10-19")) %>%
+              group_by(AgeGrouping, CollectionWeekStart) %>%
+              summarise(Tests = n()),
+            by = c("AgeGrouping", "AttributionWeekStart" = "CollectionWeekStart")
+            ) %>%
+  mutate(WeeklyPositivity = round((Cases/Tests)*100,2)) %>%
+  select(AgeGrouping, AttributionWeekStart, WeeklyPositivity) %>%
+  pivot_wider(names_from = AgeGrouping, values_from = WeeklyPositivity) %>%
+  arrange(AttributionWeekStart) %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~`0-9`,
+  type = "scatter",
+  mode = "line",
+  line = list(color = '#4E2B1F'),
+  name = 'Positivity Rate, 0-9') %>%
+add_trace(y = ~`10-19`,
+  type = "scatter",
+  mode = "line",
+  line = list(color = '#BB4628'),
+  name = 'Positivity Rate, 10-17') %>%
+  layout(title = "Weekly Positivity Rate Among School-Age Residents",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percent Positivity"),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25)) 
+
+```
+
+

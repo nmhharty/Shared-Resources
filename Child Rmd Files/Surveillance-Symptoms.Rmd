@@ -1,0 +1,98 @@
+---
+title: "Surveillance - Symptomatic"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Symptomatic  
+Comprehensive symptom information is available for cases reported on or after October 19, 2020. 
+
+Most Recent Two Weeks: **`r (as.Date(params$DataThroughDate)-days(13)) %>% format('%B %d, %Y')` through `r as.Date(params$DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=ConfProbCasesSymptomGraphDRJ}
+#uses cases reached/for whom we have symptom info as denominator rather than the total number of cases
+
+SymptomDF %>%
+  filter(symptomatic=="yes") %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(SymptomaticWeeklyCases = n()) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+  left_join((SymptomDF %>%
+               filter(!is.na(symptomatic)|event_id %in% (RecentCasesSymptUNK$event_id)) %>%
+               group_by(AttributionWeekStart) %>%
+               summarise(NumberCasesWeekDrJSymp = n())), by = c("AttributionWeekStart")) %>%
+  left_join(SymptomDF %>%
+              filter(symptomatic=="no") %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(AsymptomaticWeeklyCases = n()) %>%
+              arrange(AttributionWeekStart), by = c("AttributionWeekStart")) %>%
+    left_join(SymptomDF %>%
+              filter(symptomatic=="unknown"|event_id %in% (RecentCasesSymptUNK$event_id)) %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(UNKsympWeeklyCases = n()) %>%
+              arrange(AttributionWeekStart), by = c("AttributionWeekStart")) %>%
+  left_join(ConfProbCases %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(NumberCasesWeek = n()), by = c("AttributionWeekStart")) %>%
+  select(AttributionWeekStart, SymptomaticWeeklyCases, AsymptomaticWeeklyCases, UNKsympWeeklyCases, NumberCasesWeekDrJSymp, NumberCasesWeek) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(SymptomaticPercentage = round((SymptomaticWeeklyCases/NumberCasesWeekDrJSymp)*100,2),
+         AsymptomaticPercentage = round((AsymptomaticWeeklyCases/NumberCasesWeekDrJSymp)*100,2),
+         UNKpercentage = round((UNKsympWeeklyCases/NumberCasesWeekDrJSymp)*100,2)) %>%
+  filter(AttributionWeekStart<=params$MostRecentWeekStart&AttributionWeekStart>="2020-10-19") %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~AsymptomaticPercentage,
+            type = "bar",
+            name = "Asymptomatic",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~SymptomaticPercentage,
+            type = "bar",
+            name = 'Symptomatic',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~UNKpercentage,
+            type = "bar",
+            name = 'Symptom Status Unknown',
+            color = I("#525657")) %>%
+  add_trace(y = ~NumberCasesWeek,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Total Weekly Case Count',
+            yaxis = "y2") %>%
+  layout(title = "Weekly Proportion of Symptomatic/Asymptomatic Cases (bars) <br>with Total Weekly Cases (line)",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           dtick = 25,
+           overlaying = "y",
+           side = "right",
+           title = "Weekly Number of Cases",
+           rangemode = "tozero",
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+```
+
+

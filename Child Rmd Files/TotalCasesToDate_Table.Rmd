@@ -1,0 +1,46 @@
+---
+title: "Total Cases to Date"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Total Cases to Date (since March 1, 2020)   
+Data presented here is for cases through **`r format((params$DataThroughDate), '%B %d, %Y')`**.  
+
+**Total Cases**: `r ConfProbCases %>% filter(AttributionDate<=(params$DataThroughDate)) %>% count()`   
+  
+**Total Confirmed Cases:** `r ConfProbCases %>% filter(CaseStatus=="Confirmed", AttributionDate<=(params$DataThroughDate)) %>% count()`  
+  
+**Total Probable Cases:** `r ConfProbCases %>% filter(CaseStatus=="Probable", AttributionDate<=(params$DataThroughDate)) %>% count()`  
+  
+**Total Tests Administered:** `r DeDupNonAntibodyTests %>% ungroup() %>% filter(DuplicateRemove=="No",CollectionDate<=(params$DataThroughDate)) %>% summarise(n())`  
+  
+**Total Resident Hospitalizations:** `r COPHS %>% summarise(count = n_distinct(PersonID)) %>% pull(count)`  
+  
+**Total Deaths:**  `r ConfProbCases %>% filter(AttributionDate<=(params$DataThroughDate), Outcome=="Patient died (finding)") %>% count()`
+
+```{r label=CompareTotalsToState, results='hide'}
+ConfProbCases %>%
+  group_by(ReportedDate) %>%
+  summarise(ReportedCount = n()) %>%
+  left_join(ConfProbCases %>%
+              group_by(AttributionDate) %>%
+              summarise(AttributedCount = n()), by = c("ReportedDate"="AttributionDate"))
+
+ConfProbCases %>%
+  filter(AttributionWeekStart=="2020-11-16") %>%
+  group_by(AttributionDate) %>%
+  summarise(Count = n(), Distinct = n_distinct(EventID)) 
+
+ConfProbCases %>% 
+  filter(AttributionDate<=(params$DataThroughDate), Outcome=="Patient died (finding)") %>%
+  select(EventID, FirstName, LastName, AttributionDate)
+```

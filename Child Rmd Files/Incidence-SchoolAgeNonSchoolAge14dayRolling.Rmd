@@ -1,0 +1,77 @@
+---
+title: "Incidence: School Age vs Non-School Age"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Incidence: School Age vs Non-School Age  
+```{r label=RegionalRolling2WeekIncidenceNONSCHOOLAGESvsSCHOOLAGE}
+plot_ly(DRJcedrs %>%
+  filter(SchoolAge=="Yes") %>%
+  group_by(AttributionDate) %>%
+  summarise(SCHOOLAGE = n()) %>%
+  right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate>="2020-10-20",
+         AttributionDate<=(params$DataThroughDate)) %>%
+  arrange(AttributionDate) %>%
+  mutate(SCHOOLAGECase14da = zoo::rollsumr(SCHOOLAGE, k = 14, fill = NA),
+         SCHOOLAGERate14da = SCHOOLAGECase14da/SchoolAgePop*100000),
+          x = ~AttributionDate,
+          y = ~SCHOOLAGERate14da,
+          type = "scatter",
+          color = I("#BB4628"),
+          mode = "lines",
+          yaxis = "y",
+          name = "School Age Routt County Residents, <br>ages 5-17") %>%
+add_trace(data = (DRJcedrs %>%
+                    filter(SchoolAge=="No") %>%
+  group_by(AttributionDate) %>%
+  summarise(ROUTT = n()) %>%
+  right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate>="2020-10-20",
+         AttributionDate<=(params$DataThroughDate)) %>%
+  arrange(AttributionDate) %>%
+  mutate(ROUTTCase14da = zoo::rollsumr(ROUTT, k = 14, fill = NA),
+         ROUTTRate14da = ROUTTCase14da/NONSchoolAgePop*100000)),
+          x = ~AttributionDate,
+          y = ~ROUTTRate14da,
+          type = "scatter",
+          name = "Non-School Age Routt County Residents, <br>ages 0-4 and 18 and older",
+          mode = "lines",
+          color = I("#525657")) %>%  
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "14-day Rolling Incidence Rate per 100,000",
+                      showgrid = FALSE),
+         title = "14-Day Rolling Incidence Rate of School Age Compared to Non-School Age",
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+          annotations = list(
+           list(x = .5,
+                y = .65,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+  

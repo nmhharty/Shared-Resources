@@ -1,0 +1,54 @@
+---
+title: "Surveillance - Exposure Type Residents"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Exposure Type: Residents  
+**NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home. Travel is used in instances in which a resident or visitor acquired the virus while traveling outside of Routt County. There are two sub-categories: known contact with a confirmed case while traveling and no known contact with a positive case while traveling.  
+Most Recent Two Weeks: **`r (as.Date(params$DataThroughDate)-days(13)) %>% format('%B %d, %Y')` through `r as.Date(params$DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=TransmissionTypeResidents}
+PHtracking %>%
+  filter(`Resident or No`=="Resident", AttributionWeekStart>="2020-10-12",AttributionDate<=as.Date(params$DataThroughDate)) %>%
+  group_by(ExposureCatCollapse) %>%
+  summarise(AllCasesCount = n()) %>%
+  mutate(AllCasesTotal = (PHtracking %>%
+                            filter(`Resident or No`=="Resident", AttributionWeekStart>="2020-10-12",AttributionDate<=as.Date(params$DataThroughDate)) %>%
+                            summarise(total = n()) %>%
+                            pull())) %>%
+  left_join((PHtracking %>%
+               filter(`Resident or No`=="Resident", IsMostRecent2WeeksRolling=="Yes") %>%
+               group_by(ExposureCatCollapse) %>%
+               summarise(MostRecentCount = n()) %>%
+               mutate(MostRecentTotal = PHtracking %>%
+                        filter(`Resident or No`=="Resident", IsMostRecent2WeeksRolling=="Yes") %>%
+                        summarise(total = n()) %>%
+                        pull())), by = "ExposureCatCollapse") %>%
+  mutate(AllCasesPercent = round(AllCasesCount/AllCasesTotal,4)*100,
+         MostRecentPercent = round(MostRecentCount/MostRecentTotal,4)*100,
+         ExposureCatCollapse=fct_drop(ExposureCatCollapse)) %>%
+plot_ly(x = ~ExposureCatCollapse, 
+        y = ~MostRecentPercent,
+        name = "Resident Cases Most Recent Two Weeks",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  add_trace(x = ~ExposureCatCollapse,
+            y = ~AllCasesPercent,
+            name = "Resident Cases Since October 12, 2020",
+            type = "bar",
+            marker = list(color = "#4E2B1F")) %>%
+  layout(title = "Percentage of Cases by Exposure Grouping of Resident Cases",
+         xaxis = list(title = "Exposure Category"),
+         yaxis = list(title = "Percentage"),
+         font = list(family = "Arial", size = 12))
+```
+

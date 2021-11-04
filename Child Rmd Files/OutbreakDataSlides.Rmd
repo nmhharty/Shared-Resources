@@ -1,0 +1,157 @@
+---
+title: "Outbreaks"
+author: "Nicole Harty"
+date: "3/3/2021"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(lubridate)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(janitor)
+library(imager)
+library(googlesheets4)
+##UPDATE THESE DATES EACH WEEK FOR REPORT TO REFLECT APPROPRIATE WEEKS
+DataThroughDate <- as.Date.character("2021-02-21")
+MostRecentWeekStart <- as.Date.character("2021-02-15")
+
+RouttPop = as.numeric("25652") #this is the 2019 DOLA/Demography Office estimate
+
+DataUpdateDate = (Sys.Date())
+
+source("OutbreakData.R")
+```
+
+## All Outbreaks Active and Resolved
+```{r label=AllOutbreaks, warning=FALSE, message=FALSE}
+
+plot_ly(data = CDPHE_All %>%
+          filter(County=="Routt") %>%
+          group_by(COVID.Setting.Type) %>%
+          count() %>%
+          mutate(RouttPercentage = (n/(CDPHE_All %>%
+                                        filter(County=="Routt") %>%
+                                        count() %>%
+                                         pull(n))*100)),
+        x = ~COVID.Setting.Type,
+        y = ~RouttPercentage,
+        type = "bar",
+        color = I("#BB4628"),
+        name = "Routt County") %>%
+  add_trace(data = CDPHE_All %>%
+              filter(County!="Routt") %>%
+              group_by(COVID.Setting.Type) %>%
+              count() %>%
+              mutate(OtherPercentage = (n/(CDPHE_All %>%
+                                             filter(County!="Routt") %>%
+                                             count() %>%
+                                             pull(n))*100)),
+            x = ~COVID.Setting.Type,
+            y = ~OtherPercentage,
+            color = I("#4E2B1F"),
+            name = "Other Colorado County") %>%
+  layout(margin = list(t = 45),
+         title = list(yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Setting",
+                      tickangle = 45),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.6),
+         font = list(family = "Arial", size = 12))
+```
+
+## Active Outbreaks
+```{r label=ActiveOutbreaks, warning=FALSE, message=FALSE}
+
+plot_ly(data = CDPHE_All %>%
+          filter(County=="Routt", Investigation.status=="Active") %>%
+          group_by(COVID.Setting.Type) %>%
+          count() %>%
+          mutate(RouttPercentage = (n/(CDPHE_All %>%
+                                         filter(County=="Routt", Investigation.status=="Active") %>%
+                                         count() %>%
+                                         pull(n))*100)),
+        x = ~COVID.Setting.Type,
+        y = ~RouttPercentage,
+        type = "bar",
+        color = I("#BB4628"),
+        name = "Routt County") %>%
+  add_trace(data = CDPHE_All %>%
+              filter(County!="Routt", Investigation.status=="Active") %>%
+              group_by(COVID.Setting.Type) %>%
+              count() %>%
+              mutate(OtherPercentage = (n/(CDPHE_All %>%
+                                             filter(County!="Routt", Investigation.status=="Active") %>%
+                                             count() %>%
+                                             pull(n))*100)),
+            x = ~COVID.Setting.Type,
+            y = ~OtherPercentage,
+            color = I("#4E2B1F"),
+            name = "Other Colorado County") %>%
+  layout(margin = list(t = 45),
+         title = list(yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Setting",
+                      tickangle = 45),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.6),
+         font = list(family = "Arial", size = 12))
+```
+
+## Table of All School and Youth Outbreaks  
+  
+```{r label=AllCountiesAllOB, warning=FALSE, message=FALSE}
+CDPHE_All %>%
+  filter(COVID.Setting.Type  %in% c("Youth Sports/Activities", "School K-12")) %>%
+  group_by(County, COVID.Setting.Type) %>%
+  count() %>%
+  pivot_wider(names_from = COVID.Setting.Type, values_from = n) %>%
+  kable(caption = "All Counties, All Outbreaks Active and Resolved")
+```
+
+## Table of All Active School and Youth Outbreaks  
+
+```{r label=AllCountiesActive, warning=FALSE, message=FALSE}
+CDPHE_All %>%
+  filter(Investigation.status=="Active",
+         COVID.Setting.Type  %in% c("Youth Sports/Activities", "School K-12")) %>%
+  group_by(County, COVID.Setting.Type) %>%
+  count() %>%
+  pivot_wider(names_from = COVID.Setting.Type, values_from = n) %>%
+  kable(caption = "All Counties, Active Outbreaks")
+```
+
+## Number of Cases, Active Outbreaks  
+  
+```{r label=AllCountiesActiveCaseCounts, warning=FALSE, message=FALSE}
+CDPHE_All %>%
+  filter(Investigation.status=="Active",
+         COVID.Setting.Type  %in% c("Youth Sports/Activities", "School K-12")) %>%
+  group_by(County, COVID.Setting.Type) %>%
+  summarise(Cases = sum(Total.cases)) %>%
+  pivot_wider(names_from = COVID.Setting.Type, values_from = Cases) %>%
+  kable(caption = "All Counties, Active Outbreaks")
+```
+
+
+## Overview  
+```{r label=overviewprep, warning=FALSE, message=FALSE}
+NoCountiesYSOB <- CDPHE_All %>% 
+  filter(COVID.Setting.Type=="Youth Sports/Activities") %>% 
+  summarise(NoCounties = n_distinct(County))
+NoCasesYSOB <- CDPHE_All %>% 
+  filter(COVID.Setting.Type=="Youth Sports/Activities") %>% 
+  summarise(Cases = sum(Total.cases))
+```
+**Number of Counties with Active Youth Sports Outbreaks**: `r NoCountiesYSOB`  
+**Number Cases Associated with Active Youth Sports Outbreaks** `r NoCasesYSOB`
+
+

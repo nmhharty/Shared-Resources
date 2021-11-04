@@ -1,0 +1,87 @@
+---
+title: "Cases Per Week: Routt Residents and Visitors"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Cases Per Week: Routt Residents and Visitors  
+We have comprehensive data on visitor cases **beginning the week of September 21, 2020**. Resident cases include cases among individuals whose permanent address is in Routt County, excluding college students who are attending school outside of Routt County. Resident cases also includes individuals who reside in Routt County at least 6 months of the year. Visitor cases include cases among individuals who received a COVID-19 test from a Routt County provider and spent time in Routt County while infectious. While cross-jurisdictional information sharing is robust in Colorado, Routt County Public Health may not be informed of all cases among visitors, particularly if the person is tested outside of Routt County.  
+
+```{r label=VisitorsAdded}
+ConfProbCases %>%
+          # filter(CountsTowardTotal=="Yes") %>%
+          group_by(AttributionDate) %>%
+          summarise(DailyNumberCases = n()) %>%
+          right_join((Calendar %>%
+                        select(date, WeekStart)), by = c("AttributionDate" = "date")) %>%
+          replace(., is.na(.), 0) %>%
+          arrange(AttributionDate) %>%
+          mutate(Daily7da = zoo::rollmeanr(DailyNumberCases, k = 7, fill = NA),
+                 Sum7DayCases = zoo::rollsumr(DailyNumberCases, k = 7, fill = NA),
+                 Weekly7da = round(zoo::rollmeanr(Sum7DayCases, k = 7, fill = NA),2),
+                 Weekly7daRate = round((Weekly7da/params$RouttPop*100000),2)) %>%
+          mutate(DayofWeek = wday(AttributionDate)) %>%
+          filter(DayofWeek==1) %>%
+          left_join((ConfProbCases %>%
+                       # filter(CountsTowardTotal=="Yes") %>%
+                       group_by(AttributionWeekStart) %>%
+                       summarise(NumberCasesWeek = n())), by = c("WeekStart"="AttributionWeekStart")) %>%
+          mutate(`Resident or No` = "Resident") %>%
+          left_join(VisitorCases %>%
+                      group_by(AttributionDate) %>%
+                      summarise(DailyNumberCases = n()) %>%
+                      right_join((Calendar %>%
+                                    select(date, WeekStart)), by = c("AttributionDate" = "date")) %>%
+                      replace(., is.na(.), 0) %>%
+                      arrange(AttributionDate) %>%
+                      mutate(Daily7da = zoo::rollmeanr(DailyNumberCases, k = 7, fill = NA),
+                             Sum7DayCases = zoo::rollsumr(DailyNumberCases, k = 7, fill = NA),
+                             Weekly7da = round(zoo::rollmeanr(Sum7DayCases, k = 7, fill = NA),2)) %>%
+                      mutate(DayofWeek = wday(AttributionDate)) %>%
+                      filter(DayofWeek==1) %>%
+                      left_join((VisitorCases %>%
+                                   group_by(AttributionWeekStart) %>%
+                                   summarise(NumberCasesWeek = n())), 
+                                by = c("WeekStart"="AttributionWeekStart")), 
+                    by = c("WeekStart", "AttributionDate")) %>%
+  select(AttributionDate, WeekStart, ResidentCasesWeek = NumberCasesWeek.x, VisitorCasesWeek = NumberCasesWeek.y) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(TotalResidentVisitor=ResidentCasesWeek+VisitorCasesWeek) %>%
+  filter(WeekStart<=(params$MostRecentWeekStart)) %>%
+  filter(WeekStart>"2020-09-20") %>%
+plot_ly(
+  x = ~WeekStart,
+  y = ~ResidentCasesWeek,
+  type = "bar",
+  name = 'Residents',
+  color = I("#BB4628")) %>%
+  add_trace(y = ~VisitorCasesWeek,
+            type = "bar",
+            name = "Visitors",
+            color = I("#4E2B1F")) %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      tickangle = 45,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Number of Cases"),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12)) 
+
+#QA of resident and visitor data
+# PHtracking %>%
+#   group_by(AttributionWeekStart, `Resident or No`) %>%
+#   count()
+
+```
+  

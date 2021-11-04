@@ -1,0 +1,89 @@
+---
+title: "14-Day Rolling Sum Cases by Report Date"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## 14-Day Rolling Sum Cases by Report Date   
+```{r label=RollingAveragesReportDate}
+#Daily 14-day rolling average
+ConfProbCases %>%
+  # filter(CountsTowardTotal=="Yes") %>%
+  group_by(reporteddate) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(Calendar, by = c("reporteddate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(reporteddate) %>%
+  filter(reporteddate<=(params$DataThroughDate)) %>%
+  mutate(Case14da = zoo::rollsumr(NumberCases, k = 14, fill = NA)) %>%
+plot_ly(x = ~reporteddate,
+  y = ~Case14da,
+  type = "bar",
+  name = '14-Day Rolling Sum Number of Cases',
+  color = I("#BB4628")) %>%
+  layout(margin = list(l=50,r=50,b=25),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date"),
+         yaxis = list(title = "Number of Cases"),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 400, yref = "y1")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 300,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+
+```  

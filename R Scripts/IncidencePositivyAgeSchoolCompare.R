@@ -1,0 +1,153 @@
+plot_ly(DRJcedrs %>%
+          filter(Age>4&Age<12) %>%
+          group_by(AttributionDate) %>%
+          summarise(NewVaxElligible = n()) %>%
+          right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+          replace(., is.na(.), 0) %>%
+          filter(AttributionDate>="2020-10-20",
+                 AttributionDate<=(params$DataThroughDate)) %>%
+          arrange(AttributionDate) %>%
+          mutate(NewVaxElligibleCase14da = zoo::rollsumr(NewVaxElligible, k = 14, fill = NA),
+                 NewVaxElligibleRate14da = NewVaxElligibleCase14da/(RouttPopTable2 %>%
+                                                                      filter(AGE>4&AGE<12) %>%
+                                                                      summarise(POP = sum(TOTAL)) %>%
+                                                                      pull(POP))*100000),
+        x = ~AttributionDate,
+        y = ~NewVaxElligibleRate14da,
+        type = "scatter",
+        color = I("#BB4628"),
+        mode = "lines",
+        yaxis = "y",
+        name = "Not Yet Vaccine Elligible School Age Incidence (5-11 years)") %>%
+  add_trace(data = (DRJcedrs %>%
+                      filter(SchoolAge=="No") %>%
+                      group_by(AttributionDate) %>%
+                      summarise(ROUTT = n()) %>%
+                      right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                      replace(., is.na(.), 0) %>%
+                      filter(AttributionDate>="2020-10-20",
+                             AttributionDate<=(params$DataThroughDate)) %>%
+                      arrange(AttributionDate) %>%
+                      mutate(ROUTTCase14da = zoo::rollsumr(ROUTT, k = 14, fill = NA),
+                             ROUTTRate14da = ROUTTCase14da/NONSchoolAgePop*100000)),
+            x = ~AttributionDate,
+            y = ~ROUTTRate14da,
+            type = "scatter",
+            name = "Non-School Age Routt County Residents, <br>ages 0-4 and 18 and older",
+            mode = "lines",
+            color = I("#525657")) %>% 
+  add_trace(data = (DRJcedrs %>%
+                      filter(Age>11&Age<18) %>%
+                      group_by(AttributionDate) %>%
+                      summarise(ROUTT = n()) %>%
+                      right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                      replace(., is.na(.), 0) %>%
+                      filter(AttributionDate>="2020-10-20",
+                             AttributionDate<=(params$DataThroughDate)) %>%
+                      arrange(AttributionDate) %>%
+                      mutate(VaxElligibleCase14da = zoo::rollsumr(ROUTT, k = 14, fill = NA),
+                             VaxElligibleRate14da = VaxElligibleCase14da/(RouttPopTable2 %>%
+                                                              filter(AGE>11&AGE<18) %>%
+                                                              summarise(POP = sum(TOTAL)) %>%
+                                                              pull(POP))*100000)),
+            x = ~AttributionDate,
+            y = ~VaxElligibleRate14da,
+            type = "scatter",
+            name = "Vaccine Elligible School Age Incidence (12-17 years)",
+            mode = "lines",
+            color = I("#F2BF4C")) %>%
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "14-day Rolling Incidence Rate per 100,000",
+                      showgrid = FALSE),
+         title = "14-Day Rolling Incidence Rate of School Age Compared to Non-School Age",
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         annotations = list(
+           list(x = .5,
+                y = .65,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+         )
+  )
+
+
+NonAntibodyTests %>%
+  filter(test_type=="antigen",AgeAtCollection>17) %>%
+  select(ID,AgeAtCollection,collectiondate) %>%
+  distinct() %>%
+  group_by(collectiondate) %>%
+  summarise(TotalTests=n()) %>%
+  filter(collectiondate>"2020-08-01")  %>%
+  right_join((Calendar %>%
+                select(date) %>%
+                filter(date>"2020-02-29"&date<=(params$DataThroughDate))), by = c("collectiondate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(collectiondate) %>%
+  mutate(Sum14DayAntigenTestsADULT = zoo::rollsumr(TotalTests, k=14, fill=NA, na.rm=TRUE)) %>%
+  left_join(NonAntibodyTests %>%
+              filter(test_type=="antigen",AgeAtCollection<18) %>%
+              select(ID,AgeAtCollection,collectiondate) %>%
+              distinct() %>%
+              group_by(collectiondate) %>%
+              summarise(TotalTests=n()) %>%
+              filter(collectiondate>"2020-08-01")  %>%
+              right_join((Calendar %>%
+                            select(date) %>%
+                            filter(date>"2020-02-29"&date<=(params$DataThroughDate))), by = c("collectiondate" = "date")) %>%
+              replace(., is.na(.), 0) %>%
+              arrange(collectiondate) %>%
+              mutate(Sum14DayAntigenTestsCHILD = zoo::rollsumr(TotalTests, k=14, fill=NA, na.rm=TRUE)), by = "collectiondate") %>%
+  filter(collectiondate>"2020-08-01")  %>%
+  plot_ly(x = ~collectiondate,
+          y = ~Sum14DayAntigenTestsADULT,
+          type = "bar",
+          color = I("#4E2B1F"),
+          yaxis = "y",
+          name = "14-day Antigen Test Volume ADULTS") %>%
+  add_trace(x = ~collectiondate,
+            y = ~Sum14DayAntigenTestsCHILD,
+            type = "bar",
+            name = "14-day Antigen Test Volume CHILDREN",
+            color = I("#BB4628")) %>%
+  # add_trace(x = ~AttributionDate,
+  #           y = ~Sum14DayTests,
+  #           type = "scatter",
+  #           name = "Overall Test Volume",
+  #           mode = "lines",
+  #           color = I("#F2BF4C")) %>%
+  layout(margin = list(l=50,r=50,b=155,h=175),
+         title = "Rolling 14-day Antigen Test Volume by Age Group",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "Rolling 14 Day Test Count"),
+         barmode = "stack",
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         annotations = list(
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+         )
+  )
+

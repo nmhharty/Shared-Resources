@@ -1,0 +1,58 @@
+---
+title: "CICT Trends"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+# CI/CT Trends  
+Data from internal public health tracking spreadsheet.  
+```{r label=CasesReportedToPH}
+attr(PHtracking$ReportedDate, "tzone") <- "America/Denver"
+
+PHtracking %>%
+  mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
+                                                                hour(ReportedDate)>12 ~ "PM")) %>%
+  filter(ReportedWeekStart>="2021-09-20") %>%
+  group_by(ReportedWeekStart, `Day of Week`, AMorPM) %>%
+  count() %>%
+plot_ly(x = ~`Day of Week`,
+        y = ~n,
+        type = 'box',
+        color = ~AMorPM,
+      #  boxpoints = "all",
+        jitter = 0) %>%
+layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Sept 20",
+       boxmode = "group",
+       font = list(family = "Arial", size = 12))
+
+PHtracking %>%
+  mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
+                                                                hour(ReportedDate)>12 ~ "PM")) %>%
+  filter(ReportedWeekStart>="2021-09-20") %>%
+  group_by(ReportedWeekStart, `Day of Week`) %>%
+  count() %>%
+plot_ly(x = ~`Day of Week`,
+        y = ~n,
+        type = 'box',
+      #  boxpoints = "all",
+        jitter = 0) %>%
+layout(title = "Number of Cases Reported Each Day, by Day of Week Since Sept 20",
+       boxmode = "group",
+       font = list(family = "Arial", size = 12))
+
+
+```
+
+```{r label=TimeToInterviewComplete}
+```
+
+```{r label=TimeToInterviewAttempt}
+```

@@ -1,0 +1,102 @@
+---
+title: "Total Cases to Date"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Most Recent Week and Most Recent Two Weeks 
+The following numbers reflect the most recent week and two week period through two days ago.   
+  
+Most Recent Week: **`r (as.Date(params$DataThroughDate)-days(6)) %>% format('%B %d, %Y')` through `r (as.Date(params$DataThroughDate)) %>% format('%B %d, %Y')`**.  
+Most Recent Two Weeks: **`r (as.Date(params$DataThroughDate)-days(13)) %>% format('%B %d, %Y')` through `r as.Date(params$DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=InternalTrackingNumbers}
+InternalCurrentWeekRolling <- PHtracking %>%  
+  filter(IsMostRecentWeekRolling=="Yes", `Resident or No`=="Resident") %>% 
+  count() %>%
+  pull()
+
+InternalCurrent2WeekRolling <- PHtracking %>%  
+  filter(IsMostRecent2WeeksRolling=="Yes", `Resident or No`=="Resident") %>% 
+  count() %>%
+  pull()
+```
+
+|Metric|Most Recent Week|Most Recent Two Weeks|
+|-----|------|-----|
+|New Cases|`r ConfProbCases %>% filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r ConfProbCases %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Cases Per 100,000 People|`r ConfProbCases %>% filter(IsMostRecentWeekRolling=="Yes") %>% count() %>% mutate(CasesPer100K = round((n/params$RouttPop)*100000,1)) %>% pull(CasesPer100K)`|`r ConfProbCases %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count() %>% mutate(CasesPer100K = round((n/params$RouttPop)*100000,1)) %>% pull(CasesPer100K)`|  
+|Total Tests Administered|`r DeDupNonAntibodyTests %>% ungroup() %>% filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r DeDupNonAntibodyTests %>% ungroup() %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Total Visitor Cases|`r VisitorCases %>%  filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r VisitorCases %>%  filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Routt County Resident COVID-19 Hospitalizations|`r COPHS %>% filter(IsMostRecentWeekRolling=="Yes") %>% summarise(Count = n_distinct(PersonID)) %>% mutate(HospitCountCat = case_when(Count==0 ~ "0",Count<5 ~ "1-4",Count<10 ~ "5-9",Count>10 ~ "10+")) %>% pull(HospitCountCat)`|`r COPHS %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% summarise(Count = n_distinct(PersonID)) %>% mutate(HospitCountCat = case_when(Count==0 ~ "0",Count<5 ~ "1-4",Count<10 ~ "5-9",Count>10 ~ "10+")) %>% pull(HospitCountCat)`|
+|COVID-19 Hospitalizations at Yampa Valley Medical Center|`r Hospit %>% filter(Hospital.Name=="Yampa Valley Medical Center"&IsMostRecentWeekRolling=="Yes") %>% summarise(Count = n()) %>% mutate(HospitCountCat = case_when(Count==0 ~ "0", Count<5 ~ "1-4", Count<10 ~ "5-9", Count>10 ~ "10+")) %>% pull(HospitCountCat)`|`r Hospit %>% filter(Hospital.Name=="Yampa Valley Medical Center"&IsMostRecent2WeeksRolling=="Yes") %>% summarise(Count = n()) %>% mutate(HospitCountCat = case_when(Count==0 ~ "0",Count<5 ~ "1-4",Count<10 ~ "5-9",Count>10 ~ "10+")) %>% pull(HospitCountCat)`|  
+  
+Hospitalizations are presented as a range to protect the identity of cases. Zero hospitalizations will be shown as such.
+
+```{r label=CurrentWeekNumbers, eval = FALSE}
+#This code chunk is for testing the code that is used inline above to produce number of incident cases in the current week,
+#cases per 100K people and total tests administered
+ConfProbCases %>%
+  filter(AttributionWeekStart==params$MostRecentWeekStart) %>%
+  count()
+
+ConfProbCases %>%
+  filter(CollectionWeekStart==params$MostRecentWeekStart) %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/params$RouttPop)*100000,1)) %>%
+  pull(CasesPer100K)
+
+
+#use this to check cases
+ConfProbCases %>%
+  select(eventid, last_name, first_name, reporteddate, AttributionDate, CollectionDateWeek, earliest_collectiondate) %>%
+  arrange(CollectionDateWeek, earliest_collectiondate, AttributionDate)
+
+
+COPHS %>%
+  filter(IsMostRecentWeekRolling=="Yes") %>%
+  summarise(Count = n_distinct(PersonID)) %>%
+  pull(Count)
+  
+```
+```{r label=TwoCurrentWeekNumbers, eval = FALSE}
+#This code chunk is for testing the code that is used inline above to produce number of incident cases in the current week,
+#cases per 100K people and total tests administered
+ConfProbCases %>%
+  filter(IsMostRecent2Weeks=="Yes") %>%
+  select(eventid, last_name, first_name, reporteddate, AttributionDate, casestatus) %>%
+  group_by(AttributionDate) %>%
+  count()
+
+ConfProbCases %>%
+  filter(IsMostRecent2Weeks=="Yes") %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/params$RouttPop)*100000,1))
+
+#Below is the 2week incidence using report date, that the state does
+ConfProbCases %>%
+  filter(reporteddate>="2020-09-14"&reporteddate<"2020-09-28") %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/params$RouttPop)*100000,1))
+
+
+#Data quality checks
+ConfProbCases %>%
+  filter(casestatus=="Probable") %>%
+  select(eventid, last_name, first_name, reporteddate, AttributionDate)
+
+ConfProbCases %>%
+  filter(casestatus=="Confirmed") %>%
+  select(eventid, last_name, first_name, reporteddate, AttributionDate, gender) %>%
+  group_by(AttributionDate, gender) %>%
+  arrange(AttributionDate)
+```
+

@@ -1,0 +1,105 @@
+---
+title: "Vaccination Rates by Age and Geography"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+### Overall Vaccination Rates by Age  
+|Metric|Number|Percent|
+|-----|------|-----|
+|Routt Residents (All Ages) Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1) %>% count() %>% pull())/params$RouttPop)`|
+|Routt Residents (All Ages) Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/params$RouttPop)`|
+|Routt Residents 16+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents 16+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
+|Routt Residents 12+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents 12+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
+
+
+This table provides percentages both using the entire Routt County population as the denominator (first two rows) and the population aged 16 and older as the denominator (last two rows). As of May 12, 2021, individuals 12 to 15 years are eligible to receive a COVID-19 vaccine. Routt's Road to Recovery set a goal of 75% of county residents 16 and older completing the vaccination series, so this table includes both a percentage of all residents as well as a percentage of residents 16 and older.   
+Routt County's most vulnerable, those age 70+, have good vaccine protection with **`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>69) %>%  count() %>% pull())/(RouttPopTable %>% filter(AgeGroup10yr %in% c("70-79", "80-89", "90 and over")) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`** of Routt County's 70+ population having completed the vaccine series.  
+
+<!-- **In order to reach our goal** of *75% of Routt County's population aged 16 and older completing the COVID-19 vaccination series*, **an additional `r 15889-(PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>%  count() %>% pull())` Routt County residents** who have started the vaccination series need to complete the vaccination series.  -->
+
+```{r label=VaccinationsByAgeGroup, eval = params$Internal}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, AgeGroup5yr) %>%
+  distinct() %>%
+  group_by(AgeGroup5yr) %>%
+  summarise(TotalFullyVax = n()) %>%
+  left_join(RouttPopTable2 %>%
+              group_by(AgeGroup5yr) %>%
+              summarise(TotalPop = sum(TOTAL)), by = "AgeGroup5yr") %>%
+  mutate(FullyVaxPercent = scales::percent(TotalFullyVax/TotalPop)) %>%
+  kable(caption = "Percentage Fully Vaccinated 5-year Age Groups")
+```
+
+```{r label=VaccinationsByAgeGroup10yr, eval = params$Internal}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, AgeGroup10yr) %>%
+  distinct() %>%
+  group_by(AgeGroup10yr) %>%
+  summarise(TotalFullyVax = n()) %>%
+  left_join(RouttPopTable2 %>%
+              group_by(AgeGroup10yr) %>%
+              summarise(TotalPop = sum(TOTAL)), by = "AgeGroup10yr") %>%
+  mutate(FullyVaxPercent = scales::percent(TotalFullyVax/TotalPop)) %>%
+  kable(caption = "Percentage Fully Vaccinated 10-year Age Groups")
+```
+
+### Vaccination Rates by Geography  
+Disclaimer: Geographic information is based upon the demographic data in CIIS. Some records have missing or incomplete addresses unable to be attributed to a specific geographic area in Routt County.  
+
+```{r label=GeogRates}
+PtIZ %>%
+  mutate(City = case_when(zip_code %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          zip_code=="80428" ~ "North Routt",
+                          zip_code=="80467" ~ "South Routt",
+                          zip_code=="80469" ~ "South Routt",
+                          zip_code=="80479" ~ "South Routt",
+                          zip_code=="80483" ~ "South Routt",
+                          zip_code=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete or Missing"))) %>%
+  group_by(City) %>%
+  summarise(VaxPeople = n_distinct(patient_id)) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate("Percent Received At Least One Dose" = scales::percent((VaxPeople/Pop), accuracy = 1L)) %>%
+  select(City, `Percent Received At Least One Dose`) %>%
+  left_join((PtIZ %>%
+               filter(FullyVax=="Yes") %>%
+               mutate(City = case_when(zip_code %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                                       zip_code=="80428" ~ "North Routt",
+                                       zip_code=="80467" ~ "South Routt",
+                                       zip_code=="80469" ~ "South Routt",
+                                       zip_code=="80479" ~ "South Routt",
+                                       zip_code=="80483" ~ "South Routt",
+                                       zip_code=="81639" ~ "West Routt",
+                                       TRUE ~ as.character("Incomplete or Missing"))) %>%
+               group_by(City) %>%
+               summarise(VaxPeople = n_distinct(patient_id)) %>%
+               left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                                    Pop=c(706,3194,2463,17212)),
+                         by = c("City")) %>%
+               mutate("Percent Completed Vaccination Series" = scales::percent((VaxPeople/Pop), accuracy = 1L)) %>%
+               select(City, `Percent Completed Vaccination Series`)), by = "City") %>%
+  filter(City!="Incomplete or Missing") %>%
+  add_row(City = "Routt County Overall", 
+          `Percent Received At Least One Dose` = scales::percent((PtIZ %>% filter(dosage_num==1) %>% count() %>% pull())/params$RouttPop),
+          `Percent Completed Vaccination Series` = scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/params$RouttPop)) %>%
+  kable(caption = "Estimated Vaccination Rate by Region")
+```
+**North Routt** includes ZIP code 80428  
+**South Routt** includes ZIP codes 80467, 80469, 80479, 80483  
+**West Routt** includes ZIP code 81639  
+**Steamboat Springs** includes ZIP codes 80477, 80487, 80488  

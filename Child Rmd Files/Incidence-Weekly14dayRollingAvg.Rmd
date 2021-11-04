@@ -1,0 +1,117 @@
+---
+title: "Incidence: Weekly and 14-Day Rolling Average, Calucalted Weekly"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Incidence: Weekly and 14-Day Rolling Average, Calculated Weekly   
+This graph provides the 14-day (two week) incidence for Routt County by week. It presents the 2-week number of cases for the most recent completed reporting week (Monday through Sunday).       
+**NOTE:** Cases are attributed to a date based upon test collection date, for those who have a test collection date. For those with missing test collection dates, the report date is used.  
+```{r label=Weekly14dayIncidence}
+ConfProbCases %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(NumberCases = n()) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+  filter(AttributionWeekStart<=params$MostRecentWeekStart) %>%
+  mutate(TwoWeekCases=zoo::rollsumr(NumberCases, k = 2, fill = NA),
+         TwoWeekRate=(TwoWeekCases/25652*100000)) %>%
+  mutate(TwoWeekStartDate = AttributionWeekStart-7,
+         TwoWeekEndDate = AttributionWeekStart+6,
+         text=paste0("2 Week Case Count: ",TwoWeekCases,"<br>2 Week Start Date: ",format(TwoWeekStartDate,'%B %d, %Y'),"<br>2 Week End Date: ",format(TwoWeekEndDate,'%B %d, %Y')),
+         text2=paste0("2 Week Rate: ",round(TwoWeekRate,2),"<br>2 Week Start Date: ",format(TwoWeekStartDate,'%B %d, %Y'),"<br>2 Week End Date: ",format(TwoWeekEndDate,'%B %d, %Y'))) %>%
+plot_ly(x = ~TwoWeekStartDate,
+  y = ~TwoWeekCases,
+  type = "bar",
+  name = "Two Week (14 day) Case Count",
+  color = I("#BB4628"),
+  text = ~text,
+  hoverinfo = "text") %>%
+add_trace(x = ~TwoWeekStartDate,
+  y = ~TwoWeekRate,
+  type = 'scatter', 
+  mode = 'lines', 
+  yaxis = "y2",
+  name = '14-Day Incidence Rate per 100,000 Population for all Weekly Case',
+  line = list(color = '#4E2B1F'),
+  text = ~text2,
+  hoverinfo = "text") %>%
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-03",
+                      dtick = 1209600000,
+                      tickangle = 45,
+                      title = "2 Week Start (all dates are Mondays)"),
+         yaxis = list(title = "14-Day Incidence (Number of Cases)",
+                      range = c(0,333)),
+       yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "14-Day Incidence Rate",
+           rangemode = "tozero",
+           showgrid = F),
+         font = list(family = "Arial", size = 12),
+       legend = list(orientation = 'h', y=-.25),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 333, yref = "y")
+              ),
+          annotations = list(
+           list(x = .2,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .2,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .2,
+                y = 300,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+
+

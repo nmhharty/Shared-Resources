@@ -1,0 +1,112 @@
+---
+title: "Outbreaks"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+# Outbreaks{#Outbreaks}   
+Outbreaks included here include both confirmed and suspected outbreaks with a start date on or after 9/1/2020. Outbreak status is determined based upon epidemiologic case definition. Only confirmed outbreaks are reported by CDPHE. The bar chart shows the number of all outbreaks within a specific sector. The box-and-whisker plot shows the median (horizontal line within each box), upper and lower quartiles (top and bottom each box), minimum and maximum (vertical lines), and outliers (dots above or below the box).     
+On July 1, 2021, CDPHE updated the outbreak definition to be 5 or more cases in most settings. Two or more cases in residential care settings or correctional facilities continue to meet outbreak definition.    
+**NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home.  
+
+
+```{r label=OutbreaksBarChartCount}
+
+Outbreaks %>%
+            filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate)) %>%
+            group_by(Type2) %>%
+            summarise(Total = n()) %>%
+          mutate(PercentAll = round(Total/Outbreaks %>%
+                                            filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate)) %>%
+                                            count() %>%
+                                            pull()*100,2)) %>%
+  left_join((Outbreaks %>%
+            filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate), IsMostRecent4WeeksRolling=="Yes") %>%
+            group_by(Type2) %>%
+            summarise(MostRecent4Weeks = n()) %>%
+              mutate(Percent4Week = round(MostRecent4Weeks/Outbreaks %>%
+                                            filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate),
+                                                   IsMostRecent4WeeksRolling=="Yes") %>%
+                                            count() %>%
+                                            pull()*100,2))), by = "Type2") %>%
+  replace(., is.na(.), 0) %>%
+plot_ly(x = ~Type2,
+        y = ~PercentAll,
+        type = "bar",
+        color = I("#BB4628"),
+        name = "All Outbreaks Since September 1, 2020") %>%
+add_trace(x = ~Type2,
+        y = ~Percent4Week,
+        type = "bar",
+        color = I("#4E2B1F"),
+        name = "Most Recent 4 Weeks") %>%
+  layout(margin = list(r=50),
+         title = list(text = "Proportion of COVID-19 Outbreaks by Sector",
+                      font = list(family = "Arial", size = 14)),
+         legend = list(orientation = 'h', y=-.8),
+         xaxis = list(title = "Outbreak Sector",
+                      tickangle = 45),
+         yaxis = list(title = "Pecent of Outbreaks"))
+```
+
+```{r label=OutbreaksBarChartResolved, eval=params$Internal}
+library(googlesheets4)
+
+Outbreaks %>%
+  filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate)) %>%
+  mutate(Resolved = case_when(`End Date (Update as Needed)`<=(params$DataThroughDate) ~ "Resolved",
+                              TRUE ~ as.character("Open"))) %>%
+  group_by(Resolved, Type2) %>%
+  summarise(Total = n()) %>%
+  pivot_wider(names_from = Resolved, values_from = Total) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(Total = Open+Resolved, PercentOpen = round(Open/Total*100,2), PercentResolved = round(Resolved/Total*100,2),
+         text=paste0("Percent Open: ",PercentOpen,"<br>Percent Resolved: ",PercentResolved,"<br>Count Open: ",Open,
+                     "<br>Count Resolved: ",Resolved)) %>%
+plot_ly(x = ~Type2,
+        y = ~Resolved,
+        type = "bar",
+        color = I("#BB4628"),
+        text = ~text,
+        hoverinfo = "text",
+        name = "Resolved Outbreaks") %>%
+add_trace(x = ~Type2,
+        y = ~Open,
+        type = "bar",
+        color = I("#4E2B1F"),
+        text = ~text,
+        hoverinfo = "text",
+        name = "Open Outbreaks, Yet to be Resolved") %>%
+  layout(margin = list(r=50),
+         barmode = "stack",
+         title = list(text = "Count of COVID-19 Outbreaks Open and Resolved, by Sector",
+                      font = list(family = "Arial", size = 14)),
+         legend = list(orientation = 'h', y=-.8),
+         xaxis = list(title = "Outbreak Sector",
+                      tickangle = 45),
+         yaxis = list(title = "Count"))
+```
+
+
+```{r label=OutbreaksBoxwhisker2}
+plot_ly(data = Outbreaks %>%
+          filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate)),
+        y = ~`Total Cases`,
+        color = ~Type2,
+        colors = c('#4E2B1F', '#BB4628', "#477691", "#F2BF4C", "#525657", "#4F9237", "#864a35", "#2d4b5c", "#f7d995", "#73c058"),
+        type = "box") %>%
+  layout(margin = list(r=150),
+         title = list(text = "COVID-19 Outbreak-Associated Cases by Sector"),
+         yaxis = list(title = "Number of Cases per Outbreak"),
+         xaxis = list(tickangle = 45),
+         font = list(family = "Arial", size = 12))
+```
+

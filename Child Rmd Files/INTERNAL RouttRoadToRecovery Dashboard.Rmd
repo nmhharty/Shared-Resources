@@ -1,0 +1,2656 @@
+---
+title: "INTERNAL USE ONLY: Routt County COVID-19 Dashboard"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+editor_options: 
+  chunk_output_type: inline
+---  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(lubridate)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(janitor)
+library(imager)
+library(googlesheets4)
+##UPDATE THESE DATES EACH WEEK FOR REPORT TO REFLECT APPROPRIATE WEEKS
+DataThroughDate <- as.Date.character("2021-10-25")
+MostRecentWeekStart <- as.Date.character("2021-10-18")
+
+RouttPop = as.numeric("25652") #this is the 2019 DOLA/Demography Office estimate
+
+DataUpdateDate = (Sys.Date())
+CurrentDialStatus = "Low Risk"
+VaxPhase = "2"
+
+source("TestResultsandCases.R")
+source("VaxData.R")
+source("../COVID-Schools-Report/SchoolsDrJData.R")
+
+```
+
+```{r label=logo}
+htmltools::img(src = knitr::image_uri("RouttPHlogo.png"),
+alt = 'logo',
+style = 'position:absolute; top:105px; right:125px; padding:5px; width: 200px; height: 100px')
+```
+  
+# Introduction  
+This report includes cases reported to the Colorado Department of Public Health and Environment (CDPHE) and all PCR and antigen tests reported to CDPHE and Routt County Public Health through **`r format(DataUpdateDate, '%B %d, %Y')`**.  
+  
+This dashboard is intended to provide residents and visitors information about the community health of Routt County. The data reported reflects information the Colorado Department of Public Health and the Environment (CDPHE) collects to determine the status of each county's COVID-19 virus suppression. The data presented here complements the <a href="https://covid19.colorado.gov/data" target="_blank">state's data dashboards</a> by including data that is only available locally and presenting thresholds in locally-relevant numbers.   
+
+On April 16, 2021, Gov. Polis devolved the Dial Framework that Colorado used to describe COVID-19 risk and outline restrictions in communities across Colorado. At this time, Routt County debuted the <a href="https://static1.squarespace.com/static/5e742162d4d8ad7a14a0b869/t/607a2bede01ee434d199ced3/1618619373865/Public+Health+Order+2020-05+County+Dial.Final.Recorded.pdf" target="_blank">"Routt Road to Recovery"</a> to outline the metrics necessary for Routt County's reopening as well as the metrics that would signify substantial risk and move the county into more restrictions.
+  
+|Recovery Level|Incidence|Positivity|Hospitalizations
+|-----|-----|-----|-----|
+|Low Risk|Fewer than 200 cases per 100,000 (<52 cases) in two weeks **OR** At least 75% of Routt residents aged 16+ complete the COVID-19 vaccination series |Less than 5% |Sufficient local hospital capacity|
+|Caution|200-1000 cases per 100,000 (52-256 cases) in two weeks|5-10% |Sufficient local hospital capacity|
+|High Risk|More than 1000 cases per 100,000 (>256 cases) in two weeks|Greater than 10% | Local and/or regional hospitals at 85% or greater capacity|  
+
+**Routt County will qualify for moving to a new Recovery Level after meeting and sustaining the metrics for a new level for 7 consecutive days.** The metrics are calculated on a rolling basis. This means each day, the metric is recalculated for the most recent 14 days.  
+
+We urge our residents and visitors to take public health prevention measures seriously to keep our county safe, healthy, and open for business and community events. Please note that the dashboard reflects data up to and including two days prior to the update date. Cases are reported by date of testing, and results from some previous weeks' tests are still pending, so case counts could change.  
+
+For details on data sources, definitions, and terms, please see the [References and Definitions](#Definitions) section.  
+
+Data is updated three times per week, for all dates reported.    
+  
+# Key Metrics{#KeyMetrics}  
+The key metrics reflect the most recent two reporting weeks. For each indicator, the current two weeks are compared to the most recent prior two weeks. Here in Routt County, we are paying close attention to our test positivity rate and number of cases over two weeks. There is no single metric that tell us we are in a good or not good situation. However, **test positivity less than 5%** and/or **fewer than 52 cases in two weeks** will suggest we are in a good position.  
+
+## Routt's Road to Recovery    
+Routt's Road to Recovery uses 14-day metrics like in Dial 1.0 rather than 7-day metrics of Dial 2.0 and Dial 3.0.   
+
+```{r label = GaugeCDPHE14day, out.height="400px"}
+#reference is the prior two weeks
+
+plot_ly() %>%
+#Incidence
+  add_trace(type = "indicator",
+  mode = "number+gauge+delta",
+  value = (ConfProbCases %>%
+               filter(IsMostRecent2WeeksRolling=="Yes") %>%
+               count() %>%
+               pull()),
+  domain = list(x = c(0, 1), y = c(.6, .7)),
+  delta = list(reference = (ConfProbCases %>%
+                              filter(IsMostRecent2WeekComparison=="Yes") %>%
+                              count() %>%
+                              pull()), position = "bottom",
+              increasing = list(
+                color = "#B22222"),
+              decreasing = list(
+                color = "#008000")),
+  title = list(
+    text = "<b>Number<br>of Cases",
+    font = list(size = 12)),
+  gauge = list(
+    shape = "bullet",
+    axis = list(range = c(0, 500)),
+    steps = list(
+      list(range = c(0, 52), color = "rgb(71, 118, 145)"),
+      list(range = c(52, 256), color = "rgb(187, 70, 40)"),
+      list(range = c(256, 500), color = "rgb(78, 43, 31)")
+      ),
+    # height = 150,
+    bgcolor = "white",
+    bar = list(color = "rgba(179,170,164, .4)", thickness = 1))) %>%
+#Positivity  
+  add_trace(type = "indicator",
+  mode = "number+gauge+delta",
+  value = (ConfProbCases %>% 
+             filter(IsMostRecent2WeeksRolling=="Yes", CountsTowardTotal=="Yes") %>%
+             group_by(IsMostRecent2WeeksRolling,AttributionDate) %>%
+             summarise(Cases = n()) %>%
+             full_join(DeDupNonAntibodyTests %>%
+                         filter(IsMostRecent2WeeksRolling=="Yes") %>%
+                         group_by(IsMostRecent2WeeksRolling,CollectionDate) %>%
+                         summarise(TotalTests = n()),
+                       by = c("AttributionDate" = "CollectionDate", "IsMostRecent2WeeksRolling")) %>%
+             replace(., is.na(.), 0) %>%
+             group_by(IsMostRecent2WeeksRolling) %>%
+             summarise(TotalPositive=sum(Cases), Total=sum(TotalTests)) %>%
+             mutate(TwoWeekPositivity=round((TotalPositive/Total*100),2)) %>%
+             pull(TwoWeekPositivity)),
+  number = list(valueformat = ".2"),
+  domain = list(x = c(0, 1), y = c(.4, .5)),
+  delta = list(reference = (round(
+                            (ConfProbCases %>% 
+                               filter(CountsTowardTotal=="Yes", IsMostRecent2WeekComparison=="Yes") %>%
+                              summarise(Cases = n())) / 
+                              (DeDupNonAntibodyTests %>%
+                                          filter(IsMostRecent2WeekComparison=="Yes") %>%
+                                          group_by(IsMostRecent2WeekComparison,CollectionDate) %>%
+                                          ungroup() %>%
+                                          summarise(TotalTests = n()))*100,2) %>%
+                              pull()),
+            position = "bottom",
+            number = list(valueformat = ".2"),
+            increasing = list(color = "#B22222"),
+            decreasing = list(color = "#008000")),
+  title = list(
+    text = "<b>Percent<br>Test Positivity",
+    font = list(size = 12)),
+  gauge = list(
+    shape = "bullet",
+    axis = list(range = c(0, 15)),
+    steps = list(
+      list(range = c(0, 5), color = "rgb(71, 118, 145)"),
+      list(range = c(5, 10), color = "rgb(187, 70, 40)"),
+      list(range = c(10, 15), color = "rgb(78, 43, 31)")
+      ),
+    # height = 150,
+    bgcolor = "white",
+    bar = list(color = "rgba(179,170,164, .4)", thickness = 1))) %>%
+#Hospitalizations  
+    add_trace(type = "indicator",
+  mode = "number+gauge+delta",
+  value = (COPHS %>%
+             filter(IsMostRecent2WeeksRolling=="Yes") %>%
+             count() %>%
+             pull(n)),
+  domain = list(x = c(0, 1), y = c(.2, .3)),
+  delta = list(reference = (COPHS %>%
+             filter(IsMostRecent2WeekComparison=="Yes") %>%
+             count() %>%
+             pull(n)),
+            position = "bottom",
+          #  valueformat = ".2%",
+            increasing = list(color = "#B22222"),
+            decreasing = list(color = "#008000")),
+  title = list(
+    text = "<b>New Hospitalizations<br>",
+    font = list(size = 12)),
+  gauge = list(
+    shape = "bullet",
+    axis = list(range = c(0, 30)),
+    steps = list(
+      list(range = c(0, 15), color = "rgb(71, 118, 145)"),
+      list(range = c(15, 30), color = "rgb(78, 43, 31)")
+      ),
+    # height = 150,
+    bgcolor = "white",
+    bar = list(color = "rgba(179,170,164, .4)", thickness = 1))) %>%
+  layout(margin = list(l=175,r=10,b=50,h=100),
+         annotations = list(
+           list(x = .95, y = -.05, #position of text adjust as needed 
+                text = "Incidence (number of cases), test positivity, and hospitalizations. <br>Comparisons (red or green arrows below the metric number) reference the prior two weeks.", 
+                align = "left", 
+                showarrow = F, xref='container', yref='container', 
+                xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                font=list(size=12)),
+           list(x = .81, y = .9, #position of text adjust as needed 
+                text = paste0("<b>Most recent two reporting weeks: </b>",format((DataThroughDate-13),'%B %d, %Y')," through ",
+                              format((DataThroughDate),'%B %d, %Y')), 
+                align = "left", 
+                showarrow = F, xref='container', yref='container', 
+                xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                font=list(size=12)),
+           list(x = .82, y = .85, #position of text adjust as needed 
+                text = paste0("<b>Comparison weeks: </b>",format((DataThroughDate-20),'%B %d, %Y')," through ",
+                              format((DataThroughDate-7),'%B %d, %Y')), 
+                align = "left", 
+                showarrow = F, xref='container', yref='container', 
+                xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                font=list(size=12))
+           ))
+
+
+```
+
+```{r label = vaccineGauge}
+
+```
+
+## Total Cases to Date (since March 1, 2020)   
+Data presented here is for cases through **`r format((DataThroughDate), '%B %d, %Y')`**.  
+
+**Total Cases**: `r ConfProbCases %>% filter(AttributionDate<=(DataThroughDate)) %>% count()`   
+  
+**Total Confirmed Cases:** `r ConfProbCases %>% filter(CaseStatus=="Confirmed", AttributionDate<=(DataThroughDate)) %>% count()`  
+  
+**Total Probable Cases:** `r ConfProbCases %>% filter(CaseStatus=="Probable", AttributionDate<=(DataThroughDate)) %>% count()`  
+  
+**Total Tests Administered:** `r DeDupNonAntibodyTests %>% ungroup() %>% filter(CollectionDate<=(DataThroughDate)) %>% summarise(n())`  
+  
+**Total Resident Hospitalizations:** `r COPHS %>% summarise(count = n_distinct(PersonID)) %>% pull(count)`  
+  
+**Total Deaths:**  `r ConfProbCases %>% filter(AttributionDate<=(DataThroughDate), Outcome=="Patient died (finding)") %>% count()`
+
+```{r label=CompareTotalsToState, results='hide'}
+ConfProbCases %>%
+  group_by(ReportedDate) %>%
+  summarise(ReportedCount = n()) %>%
+  left_join(ConfProbCases %>%
+              group_by(AttributionDate) %>%
+              summarise(AttributedCount = n()), by = c("ReportedDate"="AttributionDate"))
+
+ConfProbCases %>%
+  filter(AttributionWeekStart=="2020-11-16") %>%
+  group_by(AttributionDate) %>%
+  summarise(Count = n(), Distinct = n_distinct(EventID)) 
+
+ConfProbCases %>% 
+  filter(AttributionDate<=(DataThroughDate), Outcome=="Patient died (finding)") %>%
+  select(EventID, FirstName, LastName, AttributionDate)
+```
+
+## Most Recent Week and Most Recent Two Weeks 
+The following numbers reflect the most recent week and two week period through two days ago.   
+  
+Most Recent Week: **`r (DataThroughDate-6) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+Most Recent Two Weeks: **`r (DataThroughDate-13) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=InternalTrackingNumbers}
+InternalCurrentWeekRolling <- PHtracking %>%  
+  filter(IsMostRecentWeekRolling=="Yes", `Resident or No`=="Resident") %>% 
+  count() %>%
+  pull()
+
+InternalCurrent2WeekRolling <- PHtracking %>%  
+  filter(IsMostRecent2WeeksRolling=="Yes", `Resident or No`=="Resident") %>% 
+  count() %>%
+  pull()
+```
+
+|Metric|Most Recent Week|Most Recent Two Weeks|
+|-----|------|-----|
+|New Cases|`r ConfProbCases %>% filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r ConfProbCases %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Cases Per 100,000 People|`r ConfProbCases %>% filter(IsMostRecentWeekRolling=="Yes") %>% count() %>% mutate(CasesPer100K = round((n/RouttPop)*100000,1)) %>% pull(CasesPer100K)`|`r ConfProbCases %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count() %>% mutate(CasesPer100K = round((n/RouttPop)*100000,1)) %>% pull(CasesPer100K)`|  
+|Total Tests Administered|`r DeDupNonAntibodyTests %>% ungroup() %>% filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r DeDupNonAntibodyTests %>% ungroup() %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Total Visitor Cases|`r VisitorCases %>%  filter(IsMostRecentWeekRolling=="Yes") %>% count()`|`r VisitorCases %>%  filter(IsMostRecent2WeeksRolling=="Yes") %>% count()`|  
+|Routt County Resident COVID-19 Hospitalizations|`r COPHS %>% filter(IsMostRecentWeekRolling=="Yes") %>% summarise(Count = n_distinct(PersonID)) %>% pull(Count)`|`r COPHS %>% filter(IsMostRecent2WeeksRolling=="Yes") %>% summarise(Count = n_distinct(PersonID)) %>% pull(Count)`|
+|COVID-19 Hospitalizations at Yampa Valley Medical Center|`r Hospit %>% filter(Hospital.Name=="Yampa Valley Medical Center"&IsMostRecentWeekRolling=="Yes") %>% summarise(Count = n()) %>% pull(Count)`|`r Hospit %>% filter(Hospital.Name=="Yampa Valley Medical Center"&IsMostRecent2WeeksRolling=="Yes") %>% summarise(Count = n()) %>% pull(Count)`|
+
+```{r label=CurrentWeekNumbers, results ='hide'}
+#This code chunk is for testing the code that is used inline above to produce number of incident cases in the current week,
+#cases per 100K people and total tests administered
+ConfProbCases %>%
+  filter(AttributionWeekStart==MostRecentWeekStart) %>%
+  count()
+
+ConfProbCases %>%
+  filter(CollectionWeekStart==MostRecentWeekStart) %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/RouttPop)*100000,1)) %>%
+  pull(CasesPer100K)
+
+#use this to check cases
+ConfProbCases %>%
+  select(EventID, FirstName, LastName, ReportedDate, CollectionDateWeek, Spec1_CollectionDate, AttributionDate) %>%
+  arrange(CollectionDateWeek, Spec1_CollectionDate, AttributionDate)
+
+ConfProbCases %>%
+  filter(CountsTowardTotal=="No")
+
+COPHS %>%
+  filter(IsMostRecentWeekRolling=="Yes") %>%
+  summarise(Count = n_distinct(PersonID)) %>%
+  pull(Count)
+  
+```
+```{r label=TwoCurrentWeekNumbers, results ='hide'}
+#This code chunk is for testing the code that is used inline above to produce number of incident cases in the current week,
+#cases per 100K people and total tests administered
+ConfProbCases %>%
+  filter(IsMostRecent2Weeks=="Yes") %>%
+  select(EventID, LastName, FirstName, ReportedDate, AttributionDate, CaseStatus) %>%
+  group_by(AttributionDate) %>%
+  count()
+
+ConfProbCases %>%
+  filter(IsMostRecent2Weeks=="Yes") %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/RouttPop)*100000,1))
+
+#Below is the 2week incidence using report date, that the state does
+ConfProbCases %>%
+  filter(ReportedDate>="2020-09-14"&ReportedDate<"2020-09-28") %>%
+  count() %>%
+  mutate(CasesPer100K = round((n/RouttPop)*100000,1))
+
+
+#Data quality checks
+ConfProbCases %>%
+  filter(CaseStatus=="Probable") %>%
+  select(EventID, LastName, FirstName, AttributionDate, ReportedDate)
+
+ConfProbCases %>%
+  filter(CaseStatus=="Confirmed") %>%
+  select(EventID, LastName, FirstName, AttributionDate, ReportedDate, Gender) %>%
+  group_by(AttributionDate, Gender) %>%
+  arrange(AttributionDate)
+```
+
+## Vaccination Data
+Vaccination data comes from the Colorado Immunization Information System, CIIS. This data is specific to Routt County residents independent of where they received their vaccine and does not include vaccine doses delivered by Routt County providers to non-Routt County residents. Individual records in CIIS are attributed based upon address provided by the individual when receiving a vaccine and medical records systems that report into CIIS. Therefore, Routt County's vaccination rates are impacted by CIIS data quality.    
+"Completed Vaccine Series" means that an individual has received both doses of a two-dose COVID-19 vaccine (i.e. Moderna or Pfizer) or the single dose of a one-dose COVID-19 vaccine (i.e. Janssen/J&J).  
+  
+**Routt County is currently in Phase `r VaxPhase`** of COVID-19 vaccine distribution.  
+```{r label=VaxTableData, results = 'hide'}
+PtIZ %>%
+  # filter(Vaccine.Group.Dose.Number==1, age_at_1stvaccination>69) %>%
+  # count()
+  group_by(AgeGroup10yr, dosage_num) %>%
+  summarise(Total = n_distinct(patient_id))
+RouttPopTable %>%
+  filter(AgeGroup10yr %in% c("70-79", "80-89", "90 and over")) %>%
+  summarise(TotalPop=sum(TOTAL))
+
+PtIZ %>%
+  filter(FullyVax=="Yes"&age_at_1stvaccination>60) %>% 
+  count()
+
+PtIZ %>%
+  select(patient_id, age_at_1stvaccination) %>%
+  distinct() %>%
+  group_by(age_at_1stvaccination) %>%
+  count()
+
+```
+
+### Overall Vaccination Rates by Age  
+|Metric|Number|Percent|
+|-----|------|-----|
+|Routt Residents (All Ages) Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1) %>% count() %>% pull())/RouttPop)`|
+|Routt Residents (All Ages) Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/RouttPop)`|
+|Routt Residents 16+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents 16+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
+|Routt Residents 12+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents 12+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
+
+
+This table provides percentages both using the entire Routt County population as the denominator (first two rows) and the population aged 16 and older as the denominator (last two rows). As of May 12, 2021, individuals 12 to 15 years are eligible to receive a COVID-19 vaccine. Routt's Road to Recovery set a goal of 75% of county residents 16 and older completing the vaccination series, so this table includes both a percentage of all residents as well as a percentage of residents 16 and older.   
+Routt County's most vulnerable, those age 70+, have good vaccine protection with **`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>69) %>%  count() %>% pull())/(RouttPopTable %>% filter(AgeGroup10yr %in% c("70-79", "80-89", "90 and over")) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`** of Routt County's 70+ population having completed the vaccine series.  
+
+### Vaccination Rates by Age Group  
+```{r label=VaccinationsByAgeGroup}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, AgeGroup5yr) %>%
+  distinct() %>%
+  group_by(AgeGroup5yr) %>%
+  summarise(TotalFullyVax = n()) %>%
+  left_join(RouttPopTable2 %>%
+              group_by(AgeGroup5yr) %>%
+              summarise(TotalPop = sum(TOTAL)), by = "AgeGroup5yr") %>%
+  mutate(FullyVaxPercent = scales::percent(TotalFullyVax/TotalPop)) %>%
+  kable(caption = "Percentage Fully Vaccinated 5-year Age Groups")
+```
+
+```{r label=VaccinationsByAgeGroup10yr}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, AgeGroup10yr) %>%
+  distinct() %>%
+  group_by(AgeGroup10yr) %>%
+  summarise(TotalFullyVax = n()) %>%
+  left_join(RouttPopTable2 %>%
+              group_by(AgeGroup10yr) %>%
+              summarise(TotalPop = sum(TOTAL)), by = "AgeGroup10yr") %>%
+  mutate(FullyVaxPercent = scales::percent(TotalFullyVax/TotalPop)) %>%
+  kable(caption = "Percentage Fully Vaccinated 10-year Age Groups")
+```
+
+### Vaccination Rates by Geography  
+Disclaimer: Geographic information is based upon the demographic data in CIIS. Some records have missing or incomplete addresses unable to be attributed to a specific geographic area in Routt County.  
+
+```{r label=GeogRates}
+PtIZ %>%
+  mutate(City = case_when(zip_code %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          zip_code=="80428" ~ "North Routt",
+                          zip_code=="80467" ~ "South Routt",
+                          zip_code=="80469" ~ "South Routt",
+                          zip_code=="80479" ~ "South Routt",
+                          zip_code=="80483" ~ "South Routt",
+                          zip_code=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete or Missing"))) %>%
+  group_by(City) %>%
+  summarise(VaxPeople = n_distinct(patient_id)) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate("Percent Received At Least One Dose" = scales::percent((VaxPeople/Pop), accuracy = 1L)) %>%
+  select(City, `Percent Received At Least One Dose`) %>%
+  left_join((PtIZ %>%
+               filter(FullyVax=="Yes") %>%
+               mutate(City = case_when(zip_code %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                                       zip_code=="80428" ~ "North Routt",
+                                       zip_code=="80467" ~ "South Routt",
+                                       zip_code=="80469" ~ "South Routt",
+                                       zip_code=="80479" ~ "South Routt",
+                                       zip_code=="80483" ~ "South Routt",
+                                       zip_code=="81639" ~ "West Routt",
+                                       TRUE ~ as.character("Incomplete or Missing"))) %>%
+               group_by(City) %>%
+               summarise(VaxPeople = n_distinct(patient_id)) %>%
+               left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                                    Pop=c(706,3194,2463,17212)),
+                         by = c("City")) %>%
+               mutate("Percent Completed Vaccination Series" = scales::percent((VaxPeople/Pop), accuracy = 1L)) %>%
+               select(City, `Percent Completed Vaccination Series`)), by = "City") %>%
+  filter(City!="Incomplete or Missing") %>%
+  add_row(City = "Routt County Overall", 
+          `Percent Received At Least One Dose` = scales::percent((PtIZ %>% filter(dosage_num==1) %>% count() %>% pull())/RouttPop),
+          `Percent Completed Vaccination Series` = scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/RouttPop)) %>%
+  kable(caption = "Estimated Vaccination Rate by Region")
+```
+**North Routt** includes ZIP code 80428  
+**South Routt** includes ZIP codes 80467, 80469, 80479, 80483  
+**West Routt** includes ZIP code 81639  
+**Steamboat Springs** includes ZIP codes 80477, 80487, 80488  
+
+# Graphs  
+## Incidence: Daily and 14-Day Rolling Average, Calculated Daily  
+**NOTE:** Cases are attributed to a date based upon test collection date, for those who have a test collection date. For those with missing test collection dates, the report date is used.   
+
+```{r label=RollingIncidence14day}
+plot_ly(ConfProbCases %>%
+                    group_by(AttributionDate) %>%
+                    summarise(NumberCases = n()) %>%
+                    right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    filter(AttributionDate<=(DataThroughDate)) %>%
+                    mutate(Case14da = zoo::rollsumr(NumberCases, k = 14, fill = NA)),
+          x = ~AttributionDate,
+          y = ~Case14da,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          yaxis = "y",
+          name = "Rolling 14-day Sum Cases by Specimen Collection Date") %>%
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "14-day Rolling Sum",
+                      showgrid = FALSE),
+
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 400, yref = "y1")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 300,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+```{r label=NumberCasesperDay14day}
+plot_ly(ConfProbCases %>%
+          filter(#CountsTowardTotal=="Yes", 
+                 AttributionDate<=(DataThroughDate)) %>%
+          group_by(AttributionDate) %>%
+          summarise(NumberCases = n()),
+  x = ~AttributionDate,
+  y = ~NumberCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "Daily Case") %>%
+add_trace(data = (ConfProbCases %>%
+                    group_by(AttributionDate) %>%
+                    summarise(NumberCases = n()) %>%
+                    right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    filter(AttributionDate<=(DataThroughDate)) %>%
+                    mutate(Case14da = zoo::rollsumr(NumberCases, k = 14, fill = NA))),
+          x = ~AttributionDate,
+          y = ~Case14da,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          yaxis = "y2",
+          name = "Rolling 14-day Sum Cases by Specimen Collection Date") %>%
+  layout(title = "Cases per Day with Rolling 14-day Incidence",
+          margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)"),
+         yaxis = list(title = "Number of Cases",
+                      showgrid = FALSE),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           showgrid = FALSE,
+           title = "14-day Rolling Sum",
+           rangemode = "tozero",
+           range = c(0,588)),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 588, yref = "y2")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 400,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y2 = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+```{r label=DailyAvgCasesPerDay14day}
+plot_ly(ConfProbCases %>%
+          filter(#CountsTowardTotal=="Yes", 
+                 AttributionDate<=(DataThroughDate)) %>%
+          group_by(AttributionDate) %>%
+          summarise(NumberCases = n()),
+  x = ~AttributionDate,
+  y = ~NumberCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "Daily Case") %>%
+add_trace(data = (ConfProbCases %>%
+                    group_by(AttributionDate) %>%
+                    summarise(NumberCases = n()) %>%
+                    right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    filter(AttributionDate<=(DataThroughDate)) %>%
+                    mutate(Case14daDailyAvg = zoo::rollmeanr(NumberCases, k = 14, fill = NA))),
+          x = ~AttributionDate,
+          y = ~Case14daDailyAvg,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          yaxis = "y2",
+          name = "Rolling 14-day Daily average Cases by Specimen Collection Date") %>%
+  layout(title = "Cases per Day with Rolling 14-day Average Daily Cases",
+          margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)"),
+         yaxis = list(title = "Number of Cases",
+                      showgrid = FALSE),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           showgrid = FALSE,
+           title = "14-day Rolling Average Daily Cases",
+           rangemode = "tozero",
+           range = c(0,42)),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 3.7, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 3.7, y1 = 18, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 18, y1 = 42, yref = "y2")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 1.5,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 9,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 25,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y2 = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+
+## Incidence: 7-Day Rolling Average, Calculated Daily  
+Routt County is held to case investigation and documentation metrics when the 7-day rolling incidence rate is below 100 per 100,000 population (26 cases in 7 days).  
+
+```{r label=RollingIncidence7day}
+plot_ly(ConfProbCases %>%
+                    group_by(AttributionDate) %>%
+                    summarise(NumberCases = n()) %>%
+                    right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    filter(AttributionDate<=(DataThroughDate)) %>%
+                    mutate(Case7da = zoo::rollsumr(NumberCases, k = 7, fill = NA)),
+          x = ~AttributionDate,
+          y = ~Case7da,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          yaxis = "y",
+          name = "Rolling 7-day Sum Cases by Specimen Collection Date") %>%
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "7-day Rolling Sum",
+                      showgrid = FALSE),
+
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 26, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 26, y1 = 128, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 128, y1 = 200, yref = "y1")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 56,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 150,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+
+## Incidence: School Age vs Non-School Age Incidence  
+```{r label=RegionalRolling2WeekIncidenceNONSCHOOLAGESvsSCHOOLAGE}
+plot_ly(DRJcedrs %>%
+  filter(SchoolAge=="Yes") %>%
+  group_by(AttributionDate) %>%
+  summarise(SCHOOLAGE = n()) %>%
+  right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate>="2020-10-20",
+         AttributionDate<=(DataThroughDate)) %>%
+  arrange(AttributionDate) %>%
+  mutate(SCHOOLAGECase14da = zoo::rollsumr(SCHOOLAGE, k = 14, fill = NA),
+         SCHOOLAGERate14da = SCHOOLAGECase14da/SchoolAgePop*100000),
+          x = ~AttributionDate,
+          y = ~SCHOOLAGERate14da,
+          type = "scatter",
+          color = I("#BB4628"),
+          mode = "lines",
+          yaxis = "y",
+          name = "School Age Routt County Residents, <br>ages 5-17") %>%
+add_trace(data = (DRJcedrs %>%
+                    filter(SchoolAge=="No") %>%
+  group_by(AttributionDate) %>%
+  summarise(ROUTT = n()) %>%
+  right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate>="2020-10-20",
+         AttributionDate<=(DataThroughDate)) %>%
+  arrange(AttributionDate) %>%
+  mutate(ROUTTCase14da = zoo::rollsumr(ROUTT, k = 14, fill = NA),
+         ROUTTRate14da = ROUTTCase14da/NONSchoolAgePop*100000)),
+          x = ~AttributionDate,
+          y = ~ROUTTRate14da,
+          type = "scatter",
+          name = "Non-School Age Routt County Residents, <br>ages 0-4 and 18 and older",
+          mode = "lines",
+          color = I("#525657")) %>%  
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "14-day Rolling Incidence Rate per 100,000",
+                      showgrid = FALSE),
+         title = "14-Day Rolling Incidence Rate of School Age Compared to Non-School Age",
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+          annotations = list(
+           list(x = .5,
+                y = .65,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+
+## Incidence: Weekly and 14-Day Rolling Average, Calculated Weekly   
+This graph provides the 14-day (two week) incidence for Routt County by week. It presents the 2-week number of cases for the most recent completed reporting week (Monday through Sunday).       
+**NOTE:** Cases are attributed to a date based upon test collection date, for those who have a test collection date. For those with missing test collection dates, the report date is used.  
+```{r label=Weekly14dayIncidence}
+ConfProbCases %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(NumberCases = n()) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+  filter(AttributionWeekStart<=MostRecentWeekStart) %>%
+  mutate(TwoWeekCases=zoo::rollsumr(NumberCases, k = 2, fill = NA),
+         TwoWeekRate=(TwoWeekCases/25652*100000)) %>%
+  mutate(TwoWeekStartDate = AttributionWeekStart-7,
+         TwoWeekEndDate = AttributionWeekStart+6,
+         text=paste0("2 Week Case Count: ",TwoWeekCases,"<br>2 Week Start Date: ",format(TwoWeekStartDate,'%B %d, %Y'),"<br>2 Week End Date: ",format(TwoWeekEndDate,'%B %d, %Y')),
+         text2=paste0("2 Week Rate: ",round(TwoWeekRate,2),"<br>2 Week Start Date: ",format(TwoWeekStartDate,'%B %d, %Y'),"<br>2 Week End Date: ",format(TwoWeekEndDate,'%B %d, %Y'))) %>%
+plot_ly(x = ~TwoWeekStartDate,
+  y = ~TwoWeekCases,
+  type = "bar",
+  name = "Two Week (14 day) Case Count",
+  color = I("#BB4628"),
+  text = ~text,
+  hoverinfo = "text") %>%
+add_trace(x = ~TwoWeekStartDate,
+  y = ~TwoWeekRate,
+  type = 'scatter', 
+  mode = 'lines', 
+  yaxis = "y2",
+  name = '14-Day Incidence Rate per 100,000 Population for all Weekly Case',
+  line = list(color = '#4E2B1F'),
+  text = ~text2,
+  hoverinfo = "text") %>%
+  layout(margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-03",
+                      dtick = 1209600000,
+                      tickangle = 45,
+                      title = "2 Week Start (all dates are Mondays)"),
+         yaxis = list(title = "14-Day Incidence (Number of Cases)",
+                      range = c(0,333)),
+       yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "14-Day Incidence Rate",
+           rangemode = "tozero",
+           showgrid = F),
+         font = list(family = "Arial", size = 12),
+       legend = list(orientation = 'h', y=-.25),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 333, yref = "y")
+              ),
+          annotations = list(
+           list(x = .2,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .2,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .2,
+                y = 300,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+  
+## Positivity  
+This graph shows the 14-day rolling average positivity rate (line). 
+
+```{r label=Rolling14DayAvgTestsAdministeredPer100K}
+
+plot_ly(data = (ConfProbCases %>%
+                    filter(CountsTowardTotal=="Yes") %>%
+                    group_by(AttributionDate) %>%
+                    summarise(Cases = n()) %>%
+                    full_join(DeDupNonAntibodyTests %>%
+                                group_by(CollectionDate) %>%
+                                summarise(TotalTests = n()),
+                              by = c("AttributionDate" = "CollectionDate")) %>%
+                    #  replace(., is.na(.), 0) %>%
+                    right_join((Calendar %>%
+                                  select(date) %>%
+                                  filter(date>"2020-02-29"&date<=(DataThroughDate))), by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    mutate(Sum14DayCases = zoo::rollsumr(Cases, k=14, fill=NA, na.rm=TRUE),
+                           Sum14DayTests = zoo::rollsumr(TotalTests, k=14, fill = NA, na.rm=TRUE),
+                           Rolling14DayPositivity = (Sum14DayCases/Sum14DayTests)*100)
+                          # DailyPositivity=(Cases/TotalTests)*100,
+                          #  Rolling14DayPositivity=zoo::rollmeanr(DailyPositivity, k = 14, fill = NA, na.rm=TRUE))
+                          ),
+          x = ~AttributionDate,
+          y = ~Rolling14DayPositivity,
+          type = "scatter",
+          name = "Rolling 14-day Positivity Rate",
+          yaxis = "y",
+          mode = "lines",
+          color = I("#4E2B1F")) %>%
+  layout(margin = list(l=50,r=50,b=155,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "Positivity Rate (%)"),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+                shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 5, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 5, y1 = 10, yref = "y"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 10, y1 = 20, yref = "y")
+              ),
+          annotations = list(
+           list(x = .2,
+                y = 2.5,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .2,
+                y = 7.5,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .2,
+                y = 15,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+
+``` 
+
+
+## 14-Day Rolling Sum Cases by Report Date   
+```{r label=RollingAveragesReportDate}
+#Daily 14-day rolling average
+ConfProbCases %>%
+  # filter(CountsTowardTotal=="Yes") %>%
+  group_by(ReportedDate) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(Calendar, by = c("ReportedDate" = "date")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(ReportedDate) %>%
+  filter(ReportedDate<=(DataThroughDate)) %>%
+  mutate(Case14da = zoo::rollsumr(NumberCases, k = 14, fill = NA)) %>%
+plot_ly(x = ~ReportedDate,
+  y = ~Case14da,
+  type = "bar",
+  name = '14-Day Rolling Sum Number of Cases',
+  color = I("#BB4628")) %>%
+  layout(margin = list(l=50,r=50,b=25),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Date"),
+         yaxis = list(title = "Number of Cases"),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 52, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 52, y1 = 256, yref = "y1"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 256, y1 = 400, yref = "y1")
+              ),
+          annotations = list(
+           list(x = .18,
+                y = 26,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .18,
+                y = 128,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .18,
+                y = 300,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y1',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+
+```  
+    
+## 14-Day Average Number of Tests Administered and Average Positivity  
+This graph shows the 7-day rolling average number of tests performed each day (bars) overlayed with the 7-day rolling average positivity rate (line). Clicking on the legend titles will toggle the bars or lines on and off. Since late May, Routt County has been completing well more than the minimum daily tests for our county of 38 per day.  
+```{r label=Rollin7DayAvgTestsAdministeredPer100K}
+
+plot_ly(data = (DeDupNonAntibodyTests %>%
+                   group_by(CollectionDate) %>% 
+                   summarise(TotalTests = n()) %>%
+                  # replace(., is.na(.), 0) %>%
+                   right_join((Calendar %>%
+                                 select(date) %>%
+                                 filter(date>"2020-02-29"&date<=(DataThroughDate))), by = c("CollectionDate" = "date")) %>%
+                  replace(., is.na(.), 0) %>%
+                   arrange(CollectionDate) %>%
+                   mutate(Rolling14DayTestsAvg=round(zoo::rollmeanr(TotalTests, k = 14, fill = NA, na.rm=TRUE)),
+                          Rolling14DayTestRate=round(((Rolling14DayTestsAvg/25652)*100000),2))), 
+        x = ~CollectionDate,
+        y = ~Rolling14DayTestsAvg,
+        name = '14-day Rolling Average Daily Number of Tests performed',
+        type = 'bar',
+        color = I("#BB4628")) %>%
+add_trace(data = (ConfProbCases %>%
+                    filter(CountsTowardTotal=="Yes") %>%
+                    group_by(AttributionDate) %>%
+                    summarise(Cases = n()) %>%
+                    full_join(DeDupNonAntibodyTests %>%
+                                group_by(CollectionDate) %>%
+                                summarise(TotalTests = n()),
+                              by = c("AttributionDate" = "CollectionDate")) %>%
+                    #  replace(., is.na(.), 0) %>%
+                    right_join((Calendar %>%
+                                  select(date) %>%
+                                  filter(date>"2020-02-29"&date<=(DataThroughDate))), by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    mutate(Sum14DayCases = zoo::rollsumr(Cases, k=14, fill=NA, na.rm=TRUE),
+                           Sum14DayTests = zoo::rollsumr(TotalTests, k=14, fill = NA, na.rm=TRUE),
+                           Rolling14DayPositivity = (Sum14DayCases/Sum14DayTests)*100)
+                          ),
+          x = ~AttributionDate,
+          y = ~Rolling14DayPositivity,
+          type = "scatter",
+          name = "Rolling 14-day Positivity Rate",
+          yaxis = "y2",
+          mode = "lines",
+          color = I("#4E2B1F")) %>%
+  layout(margin = list(l=50,r=50,b=155,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Number of Tests"),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "Percent Positivity",
+           rangemode = "tozero",
+           showgrid = FALSE),
+         shapes = list(
+                list(type = "rect",
+                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 0, y1 = 5, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 5, y1 = 10, yref = "y2"),
+              list(type = "rect",
+                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
+                    x0 = 0, x1 = 1, xref = "paper",
+                    y0 = 10, y1 = 25, yref = "y2")
+              ),
+          annotations = list(
+           list(x = .2,
+                y = 2.5,
+                text = "Low Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#477691")),
+           list(x = .2,
+                y = 7.5,
+                text = "Caution",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#BB4628")),
+           list(x = .2,
+                y = 15,
+                text = "High Risk",
+                xref = "paper",
+                yref = 'y2',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+``` 
+
+
+## Cases Per Week: Routt Residents and Visitors  
+We have comprehensive data on visitor cases **beginning the week of September 21, 2020**. Resident cases include cases among individuals whose permanent address is in Routt County, excluding college students who are attending school outside of Routt County. Resident cases also includes individuals who reside in Routt County at least 6 months of the year. Visitor cases include cases among individuals who received a COVID-19 test from a Routt County provider and spent time in Routt County while infectious. While cross-jurisdictional information sharing is robust in Colorado, Routt County Public Health may not be informed of all cases among visitors, particularly if the person is tested outside of Routt County.  
+
+```{r label=VisitorsAdded}
+ConfProbCases %>%
+          # filter(CountsTowardTotal=="Yes") %>%
+          group_by(AttributionDate) %>%
+          summarise(DailyNumberCases = n()) %>%
+          right_join((Calendar %>%
+                        select(date, WeekStart)), by = c("AttributionDate" = "date")) %>%
+          replace(., is.na(.), 0) %>%
+          arrange(AttributionDate) %>%
+          mutate(Daily7da = zoo::rollmeanr(DailyNumberCases, k = 7, fill = NA),
+                 Sum7DayCases = zoo::rollsumr(DailyNumberCases, k = 7, fill = NA),
+                 Weekly7da = round(zoo::rollmeanr(Sum7DayCases, k = 7, fill = NA),2),
+                 Weekly7daRate = round((Weekly7da/RouttPop*100000),2)) %>%
+          mutate(DayofWeek = wday(AttributionDate)) %>%
+          filter(DayofWeek==1) %>%
+          left_join((ConfProbCases %>%
+                       # filter(CountsTowardTotal=="Yes") %>%
+                       group_by(AttributionWeekStart) %>%
+                       summarise(NumberCasesWeek = n())), by = c("WeekStart"="AttributionWeekStart")) %>%
+          mutate(`Resident or No` = "Resident") %>%
+          left_join(VisitorCases %>%
+                      group_by(AttributionDate) %>%
+                      summarise(DailyNumberCases = n()) %>%
+                      right_join((Calendar %>%
+                                    select(date, WeekStart)), by = c("AttributionDate" = "date")) %>%
+                      replace(., is.na(.), 0) %>%
+                      arrange(AttributionDate) %>%
+                      mutate(Daily7da = zoo::rollmeanr(DailyNumberCases, k = 7, fill = NA),
+                             Sum7DayCases = zoo::rollsumr(DailyNumberCases, k = 7, fill = NA),
+                             Weekly7da = round(zoo::rollmeanr(Sum7DayCases, k = 7, fill = NA),2)) %>%
+                      mutate(DayofWeek = wday(AttributionDate)) %>%
+                      filter(DayofWeek==1) %>%
+                      left_join((VisitorCases %>%
+                                   group_by(AttributionWeekStart) %>%
+                                   summarise(NumberCasesWeek = n())), 
+                                by = c("WeekStart"="AttributionWeekStart")), 
+                    by = c("WeekStart", "AttributionDate")) %>%
+  select(AttributionDate, WeekStart, ResidentCasesWeek = NumberCasesWeek.x, VisitorCasesWeek = NumberCasesWeek.y) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(TotalResidentVisitor=ResidentCasesWeek+VisitorCasesWeek) %>%
+  filter(WeekStart<=(DataThroughDate)) %>%
+  filter(WeekStart>"2020-09-20") %>%
+plot_ly(
+  x = ~WeekStart,
+  y = ~ResidentCasesWeek,
+  type = "bar",
+  name = 'Residents',
+  color = I("#BB4628")) %>%
+  add_trace(y = ~VisitorCasesWeek,
+            type = "bar",
+            name = "Visitors",
+            color = I("#4E2B1F")) %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      tickangle = 45,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Number of Cases"),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12)) 
+
+#QA of resident and visitor data
+# PHtracking %>%
+#   group_by(AttributionWeekStart, `Resident or No`) %>%
+#   count()
+
+```
+  
+## PCR Test Result Delay  
+**Average Delay from Specimen Collection Date to Report Date, per Week** for most recent 6 weeks. Routt County Providers refers to all providers in the county who are sending their specimens to UCHealth/University Hospital, the CDPHE State Lab, or other private labs.      
+
+```{r label=TestResultDelayGraph}
+# PCRtests %>%
+#   filter(CollectionDate>"2021-03-01") %>%
+#   group_by(PerformingLab#, Submitter
+#            ) %>%
+#   count() %>%
+#   arrange(desc(n))
+PCRtests %>%
+  filter(PerformingLab %in% c("CDPHE - State Lab", "Other", "University Hospital", "Curative, Inc.", "Yampa Valley Medical Center",
+                              "ARUP", "LabCorp", "Immunogeno", "ImmunoGenomics", "Fulgent Genetics (CA)", "National Jewish Health",
+                              "Quest Diagnostics", "Aegis Sciences Corp (TN)", "ATCG Lab", "VRL Eurofins", "Mako Medical Lab", 
+                              "VRLEUROFINSCO")) %>%
+  filter(!is.na(CollectionDate)) %>%
+  mutate(ExcludeStateLab = case_when(PerformingLab=="CDPHE - State Lab"&CollectionDate>"2020-11-22"&CollectionDate<"2021-03-01" ~ "Yes",
+                                     PerformingLab=="Curative, Inc."&CollectionDate<"2020-11-16" ~ "Yes",
+                                     TRUE ~ as.character("No"))) %>%
+  filter(ExcludeStateLab=="No") %>%
+  mutate(ReportDelay = ReportDate-CollectionDate,
+         Lab = fct_collapse(PerformingLab, "Routt County Providers"=c("Other", "University Hospital", "Yampa Valley Medical Center",
+                              "ARUP", "LabCorp", "Immunogeno", "ImmunoGenomics", "Fulgent Genetics (CA)", "Quest Diagnostics", 
+                              "Aegis Sciences Corp (TN)", "CDPHE - State Lab", "National Jewish Health", "Curative, Inc.", "ATCG Lab",
+                              "VRL Eurofins", "Mako Medical Lab", "VRLEUROFINSCO"))) %>% 
+  group_by(CollectionWeekStart, Lab) %>%
+  summarise(AvgDelay = as.numeric(mean(ReportDelay, na.rm=TRUE))) %>%
+  pivot_wider(names_from = Lab, values_from = AvgDelay) %>%
+  rename("Routt County Providers Delay" = "Routt County Providers") %>%
+  left_join(PCRtests %>%
+              filter(PerformingLab %in% c("Other", "University Hospital", "Yampa Valley Medical Center", "ARUP", "LabCorp", "Immunogeno",
+                                          "ImmunoGenomics", "Fulgent Genetics (CA)", "Quest Diagnostics", "Aegis Sciences Corp (TN)", 
+                                          "CDPHE - State Lab", "National Jewish Health", "Curative, Inc.", "ATCG Lab", "VRL Eurofins", 
+                                          "Mako Medical Lab", "VRLEUROFINSCO")) %>%
+              filter(!is.na(CollectionDate)) %>%
+              mutate(Exclude = case_when(PerformingLab=="CDPHE - State Lab"&CollectionDate>"2020-11-22"&CollectionDate<"2021-03-01" ~ "Yes",
+                                         PerformingLab=="Curative, Inc."&CollectionDate<"2020-11-16" ~ "Yes",
+                                         TRUE ~ as.character("No"))) %>%
+              filter(Exclude=="No") %>%
+              mutate(ReportDelay = ReportDate-CollectionDate, 
+                     Lab = fct_collapse(PerformingLab, "Routt County Providers"=c("Other", "University Hospital", "Yampa Valley Medical Center",
+                                                                                  "ARUP", "LabCorp", "Immunogeno", "ImmunoGenomics", 
+                                                                                  "Fulgent Genetics (CA)", "Quest Diagnostics", 
+                                                                                  "Aegis Sciences Corp (TN)", "CDPHE - State Lab", 
+                                                                                  "National Jewish Health", "Curative, Inc.",
+                                                                                  "ATCG Lab", "VRL Eurofins", "Mako Medical Lab",
+                                                                                  "VRLEUROFINSCO"))) %>%  
+              group_by(CollectionWeekStart, Lab) %>%
+              summarise(NumTests = n()) %>%
+              pivot_wider(names_from = Lab, values_from = NumTests) %>%
+              rename("Routt County Providers Number of Tests" = "Routt County Providers"), by = "CollectionWeekStart") %>%
+  filter(CollectionWeekStart>(MostRecentWeekStart-42)) %>%
+  filter(CollectionWeekStart<=MostRecentWeekStart) %>%
+  mutate(textCountyProviders=paste0("Number of Tests: ",`Routt County Providers Number of Tests`,
+                                    "<br>Avg Delay: ",round(`Routt County Providers Delay`,2)," days")) %>%
+plot_ly(x = ~CollectionWeekStart, y = ~AvgDelay) %>%
+  add_trace(y = ~`Routt County Providers Delay`,
+            name = "Routt County Providers",
+            type = "bar",
+            marker = list(color = "#BB4628"),
+            text = ~textCountyProviders,
+            hoverinfo = "text") %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Average Delay (days)",
+                      nticks = 6),
+         font = list(family = "Arial", size = 12))
+
+
+```
+
+
+# Outbreaks{#Outbreaks}   
+Outbreaks included here include both confirmed and suspected outbreaks with a start date on or after 9/1/2020. Outbreak status is determined based upon epidemiologic case definition. Only confirmed outbreaks are reported by CDPHE. The bar chart shows the number of all outbreaks within a specific sector. The box-and-whisker plot shows the median (horizontal line within each box), upper and lower quartiles (top and bottom each box), minimum and maximum (vertical lines), and outliers (dots above or below the box).     
+On July 1, 2021, CDPHE updated the outbreak definition to be 5 or more cases in most settings. Two or more cases in residential care settings or correctional facilities continue to meet outbreak definition.  
+**NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home.  
+
+```{r label=OutbreaksBarChartCount}
+library(googlesheets4)
+
+Outbreaks <- range_read("https://docs.google.com/spreadsheets/d/1mLEWVyOADxp4FsVBvGjKpJFM97jpImAhsxQVUI1Ga1Q/edit#gid=167774008",
+                 sheet = "Dashboard Source Sheet")
+Outbreaks <- Outbreaks %>%
+  mutate(IsMostRecent4WeeksRolling = case_when(`Start Date` %within% RollingRecent4Week ~ "Yes",
+                                               TRUE ~ as.character("No")))
+
+Outbreaks %>%
+            filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate)) %>%
+            group_by(Type2) %>%
+            summarise(Total = n()) %>%
+          mutate(PercentAll = round(Total/Outbreaks %>%
+                                            filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate)) %>%
+                                            count() %>%
+                                            pull()*100,2)) %>%
+  left_join((Outbreaks %>%
+            filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate), IsMostRecent4WeeksRolling=="Yes") %>%
+            group_by(Type2) %>%
+            summarise(MostRecent4Weeks = n()) %>%
+              mutate(Percent4Week = round(MostRecent4Weeks/Outbreaks %>%
+                                            filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate),
+                                                   IsMostRecent4WeeksRolling=="Yes") %>%
+                                            count() %>%
+                                            pull()*100,2))), by = "Type2") %>%
+  replace(., is.na(.), 0) %>%
+plot_ly(x = ~Type2,
+        y = ~PercentAll,
+        type = "bar",
+        color = I("#BB4628"),
+        name = "All Outbreaks Since September 1, 2020") %>%
+add_trace(x = ~Type2,
+        y = ~Percent4Week,
+        type = "bar",
+        color = I("#4E2B1F"),
+        name = "Most Recent 4 Weeks") %>%
+  layout(margin = list(r=50),
+         title = list(text = "Proportion of COVID-19 Outbreaks by Sector",
+                      font = list(family = "Arial", size = 14)),
+         legend = list(orientation = 'h', y=-.8),
+         xaxis = list(title = "Outbreak Sector",
+                      tickangle = 45),
+         yaxis = list(title = "Pecent of Outbreaks"))
+```
+
+```{r label=OutbreaksBarChartResolved}
+library(googlesheets4)
+
+Outbreaks %>%
+  filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate)) %>%
+  mutate(Resolved = case_when(`End Date (Update as Needed)`<=(DataThroughDate) ~ "Resolved",
+                              TRUE ~ as.character("Open"))) %>%
+  group_by(Resolved, Type2) %>%
+  summarise(Total = n()) %>%
+  pivot_wider(names_from = Resolved, values_from = Total) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(Total = Open+Resolved, PercentOpen = round(Open/Total*100,2), PercentResolved = round(Resolved/Total*100,2),
+         text=paste0("Percent Open: ",PercentOpen,"<br>Percent Resolved: ",PercentResolved,"<br>Count Open: ",Open,
+                     "<br>Count Resolved: ",Resolved)) %>%
+plot_ly(x = ~Type2,
+        y = ~Resolved,
+        type = "bar",
+        color = I("#BB4628"),
+        text = ~text,
+        hoverinfo = "text",
+        name = "Resolved Outbreaks") %>%
+add_trace(x = ~Type2,
+        y = ~Open,
+        type = "bar",
+        color = I("#4E2B1F"),
+        text = ~text,
+        hoverinfo = "text",
+        name = "Open Outbreaks, Yet to be Resolved") %>%
+  layout(margin = list(r=50),
+         barmode = "stack",
+         title = list(text = "Count of COVID-19 Outbreaks Open and Resolved, by Sector",
+                      font = list(family = "Arial", size = 14)),
+         legend = list(orientation = 'h', y=-.8),
+         xaxis = list(title = "Outbreak Sector",
+                      tickangle = 45),
+         yaxis = list(title = "Count"))
+```
+
+```{r label=OutbreaksBoxwhisker2}
+plot_ly(data = Outbreaks %>%
+          filter(Status!="Under Investigation", `Start Date`<=(DataThroughDate)),
+        y = ~`Total Cases`,
+        color = ~Type2,
+        colors = c('#4E2B1F', '#BB4628', "#477691", "#F2BF4C", "#525657", "#4F9237", "#864a35", "#2d4b5c", "#f7d995", "#73c058"),
+        type = "box") %>%
+  layout(margin = list(r=150),
+         title = list(text = "COVID-19 Outbreak-Associated Cases by Sector"),
+         yaxis = list(title = "Number of Cases per Outbreak"),
+         xaxis = list(tickangle = 45),
+         font = list(family = "Arial", size = 12))
+```
+
+  
+# Surveillance    
+This section provides summaries of the type of transmission for cases and is shown for both Routt County visitors and residents. Data is available for cases **beginning October 12, 2020**. Unlike other sections of the dashboard that use CEDRS data for cases, the source data is Routt County Public Health case investigation which means some resident cases may be included here that are not yet in CEDRS or vice versa.    
+
+## Case Outcomes  
+Case outcomes are reported according to the most severe outcome during the illness. For example, a hospitalized patient will be listed as hospitalized even after they have returned home. Outcome definitions are as follows:  
+  
+* Died = patient reported as died in CEDRS
+* Hospitalized = hospitalized during illness
+* Recovered = more than 28 days have passed since symptoms or test AND not hospitalized AND not died
+* Active = within 28 days of symptoms or test
+
+```{r label=CaseOutcomes}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            group_by(CaseOutcome) %>%
+            count(),
+          labels = ~CaseOutcome, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691", "#F2BF4C"))) %>%
+  layout(margin = c(t=150),
+         title = list(text = "COVID-19 Case Outcomes",
+                      yref = "paper",
+                      y = 1.5,
+                      font = list(family = "Arial", size = 14)))
+```
+
+```{r label=CaseOutcomesAge}
+ConfProbCases %>%
+  group_by(AgeGrouping, CaseOutcome) %>%
+  summarise(NumberCases = n()) %>%
+  pivot_wider(names_from = CaseOutcome, values_from = NumberCases) %>%
+  left_join((ConfProbCases %>%
+               group_by(AgeGrouping) %>%
+               summarise(TotalCases = n())), by = "AgeGrouping") %>%
+  replace(., is.na(.), 0) %>%
+  mutate(RecoveredPct = round(Recovered/TotalCases*100,2),
+         HospitalPct = round(Hospitalized/TotalCases*100,2),
+         ActivePct = round(Active/TotalCases*100,2),
+         DiedPct = round(Died/TotalCases*100,2)) %>%
+plot_ly(x = ~AgeGrouping,
+        y = ~RecoveredPct,
+        type = "bar",
+        name = "Recovered",
+        color = I("#F2BF4C")) %>%
+add_trace(y = ~HospitalPct,
+          type = "bar",
+          name = "Hospitalized",
+          color = I("#477691")) %>%
+add_trace(y = ~DiedPct,
+          type = "bar",
+          name = "Died",
+          color = I("#BB4628")) %>%
+add_trace(y = ~ActivePct,
+          type = "bar",
+          name = "Active",
+          color = I("#4E2B1F")) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Case Outcomes by Age",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Proportion"),
+         barmode = "stack",
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+  
+```
+
+
+## Symptomatic  
+Comprehensive symptom information is available for cases reported on or after October 19, 2020. 
+
+Most Recent Two Weeks: **`r (DataThroughDate-13) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=ConfProbCasesSymptomGraph}
+SymptomOverview %>%
+  filter(SymptomsEver=="Yes") %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(SymptomaticWeeklyCases = n()) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+  left_join((SymptomOverview %>%
+               group_by(AttributionWeekStart) %>%
+               summarise(NumberCasesWeek = n())), by = c("AttributionWeekStart")) %>%
+  left_join(SymptomOverview %>%
+              filter(SymptomsEver=="No") %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(AsymptomaticWeeklyCases = n()) %>%
+              arrange(AttributionWeekStart), by = c("AttributionWeekStart")) %>%
+  select(AttributionWeekStart, SymptomaticWeeklyCases, AsymptomaticWeeklyCases, NumberCasesWeek) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(SymptomaticPercentage = round((SymptomaticWeeklyCases/NumberCasesWeek)*100,2),
+         AsymptomaticPercentage = round((AsymptomaticWeeklyCases/NumberCasesWeek)*100,2)) %>%
+  filter(AttributionWeekStart<=MostRecentWeekStart&AttributionWeekStart>="2020-10-19") %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~AsymptomaticPercentage,
+            type = "bar",
+            name = "Asymptomatic",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~SymptomaticPercentage,
+            type = "bar",
+            name = 'Symptomatic',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~NumberCasesWeek,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Total Weekly Case Count',
+            yaxis = "y2") %>%
+  layout(title = "Weekly Proportion of Symptomatic/Asymptomatic Cases (bars) <br>with Total Weekly Cases (line) CDPHE DATA",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "Weekly Number of Cases",
+           rangemode = "tozero",
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25)) 
+```
+
+```{r label=ConfProbCasesSymptomGraphDRJ}
+#uses cases reached/for whom we have symptom info as denominator rather than the total number of cases
+
+SymptomDF %>%
+  filter(symptomatic=="yes") %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(SymptomaticWeeklyCases = n()) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+  left_join((SymptomDF %>%
+               filter(!is.na(symptomatic)|event_id %in% (RecentCasesSymptUNK$event_id)) %>%
+               group_by(AttributionWeekStart) %>%
+               summarise(NumberCasesWeekDrJSymp = n())), by = c("AttributionWeekStart")) %>%
+  left_join(SymptomDF %>%
+              filter(symptomatic=="no") %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(AsymptomaticWeeklyCases = n()) %>%
+              arrange(AttributionWeekStart), by = c("AttributionWeekStart")) %>%
+    left_join(SymptomDF %>%
+              filter(symptomatic=="unknown"|event_id %in% (RecentCasesSymptUNK$event_id)) %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(UNKsympWeeklyCases = n()) %>%
+              arrange(AttributionWeekStart), by = c("AttributionWeekStart")) %>%
+  left_join(ConfProbCases %>%
+              group_by(AttributionWeekStart) %>%
+              summarise(NumberCasesWeek = n()), by = c("AttributionWeekStart")) %>%
+  select(AttributionWeekStart, SymptomaticWeeklyCases, AsymptomaticWeeklyCases, UNKsympWeeklyCases, NumberCasesWeekDrJSymp, NumberCasesWeek) %>%
+  replace(., is.na(.), 0) %>%
+  mutate(SymptomaticPercentage = round((SymptomaticWeeklyCases/NumberCasesWeekDrJSymp)*100,2),
+         AsymptomaticPercentage = round((AsymptomaticWeeklyCases/NumberCasesWeekDrJSymp)*100,2),
+         UNKpercentage = round((UNKsympWeeklyCases/NumberCasesWeekDrJSymp)*100,2)) %>%
+  filter(AttributionWeekStart<=MostRecentWeekStart&AttributionWeekStart>="2020-10-19") %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~AsymptomaticPercentage,
+            type = "bar",
+            name = "Asymptomatic",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~SymptomaticPercentage,
+            type = "bar",
+            name = 'Symptomatic',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~UNKpercentage,
+            type = "bar",
+            name = 'Symptom Status Unknown',
+            color = I("#525657")) %>%
+  add_trace(y = ~NumberCasesWeek,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Total Weekly Case Count',
+            yaxis = "y2") %>%
+  layout(title = "Weekly Proportion of Symptomatic/Asymptomatic Cases (bars) <br>with Total Weekly Cases (line)",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           dtick = 25,
+           overlaying = "y",
+           side = "right",
+           title = "Weekly Number of Cases",
+           rangemode = "tozero",
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+```
+
+
+## Vaccine Efficacy and Breakthrough    
+Clinical trials for COVID-19 vaccines were designed to assess efficacy in preventing severe disease, hospitalization, and/or death. No vaccine is 100% effective. Therefore, we expect to see vaccine breakthrough cases, and we expect to see a small portion of cases (5-15%) among vaccinated individuals who do develop severe disease, hospitalization, or death. 
+Vaccine breakthrough is defined as a positive COVID-19 test at least 14 days after completing the COVID-19 vaccination series. Identifying vaccine breakthrough relies upon data in CIIS as well as self-reported (and later verified) information gathered during case investigations.  
+
+```{r label=VaxBreakthroughbyMonthGraph3}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, vaccination_date) %>%
+  distinct() %>%
+  mutate(FullyVaxDate = vaccination_date+14,
+         FullyVaxDateMonth = month(FullyVaxDate)) %>%
+#  filter(FullyVaxDateMonth<month(Sys.Date(), label = TRUE), FullyVaxDateMonth!="Jan") %>%
+  group_by(FullyVaxDateMonth) %>%
+  summarise(Count = n()) %>%
+  mutate(RollingSumFullyVax = cumsum(Count),
+         FullyVaxPercent = round((RollingSumFullyVax/RouttPop)*100,2),
+         NotFullyVaxPercent = round(((RouttPop-RollingSumFullyVax)/RouttPop)*100,2)) %>%
+  left_join(VaxBreakthroughList %>%
+            mutate(AttributionMonth = month(AttributionDate)) %>%
+           #   filter(AttributionMonth<month(Sys.Date(), label = TRUE), AttributionMonth!="Jan") %>%
+              group_by(AttributionMonth) %>%
+              summarise(VaxBreakthrough = n()) %>%
+              left_join(ConfProbCases %>%
+                          mutate(AttributionMonth = month(AttributionDate)) %>%
+                       #   filter(AttributionMonth<month(Sys.Date(), label = TRUE), Age>11, AttributionMonth!="Jan") %>%
+                          group_by(AttributionMonth) %>%
+                          summarise(Total = n()), by = "AttributionMonth") %>%
+              mutate(VaxBreakthroughPercent = round((VaxBreakthrough/Total)*100,2)), by = c("FullyVaxDateMonth" = "AttributionMonth")) %>%
+plot_ly(
+  x = ~FullyVaxDateMonth,
+  y = ~FullyVaxPercent,
+            type = "bar",
+            name = "Fully Vaccinated",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~NotFullyVaxPercent,
+            type = "bar",
+            name = 'Not Fully Vaccinated',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~VaxBreakthroughPercent,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Monthly Proportion Vaccine Breakthrough',
+            yaxis = "y2") %>%
+  layout(margin = list(l=50,r=50,h=100),
+         title = "Monthly Fully Vaccinated (brown bar) and Proportion Monthly Vaccine Breakthrough Cases (line)",
+         xaxis = list(title ="Month"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "Monthly Proportion of Vaccine Breakthrough Cases",
+           rangemode = "tozero",
+           range = c(0,100),
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+
+```
+
+```{r label=VaxBreakthroughbyMonthGraph4}
+FullyVax %>%
+ filter(FullyVaxMonthAttr!="Jan") %>%
+  group_by(FullyVaxMonthAttr) %>%
+  summarise(Count = n()) %>%
+  mutate(RollingSumFullyVax = cumsum(Count),
+         FullyVaxPercent = round((RollingSumFullyVax/RouttPop)*100,2),
+         NotFullyVaxPercent = round(((RouttPop-RollingSumFullyVax)/RouttPop)*100,2)) %>%
+  left_join(VaxBreakthroughList %>%
+            mutate(AttributionMonth = month(AttributionDate, label = TRUE)) %>%
+             filter(AttributionMonth!="Jan") %>%
+              group_by(AttributionMonth) %>%
+              summarise(VaxBreakthrough = n()) %>%
+              left_join(ConfProbCases %>%
+                          mutate(AttributionMonth = month(AttributionDate, label = TRUE)) %>%
+                         filter(Age>11, AttributionMonth!="Jan") %>%
+                          group_by(AttributionMonth) %>%
+                          summarise(Total = n()), by = "AttributionMonth") %>%
+              mutate(VaxBreakthroughPercent = round((VaxBreakthrough/Total)*100,2)), by = c("FullyVaxMonthAttr" = "AttributionMonth")) %>%
+plot_ly(
+  x = ~FullyVaxMonthAttr,
+  y = ~FullyVaxPercent,
+            type = "bar",
+            name = "Monthly Percentage Population Fully Vaccinated: <br># Routt County residents more than 14 days <br>beyond final dose divided by total population",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~VaxBreakthroughPercent,
+            type = "bar",
+            color = I('#BB4628'),
+            name = 'Monthly Percentage Vaccine Breakthrough Cases: <br># vaccine breakthrough cases divided <br>by total # cases age 12+') %>%
+  layout(margin(b=500),
+         title = list(text = "Percentage Population Fully Vaccinated (brown) and <br>Percentage of Vaccine Breakthrough Cases Ages 12+ (orange), by Month"),
+         xaxis = list(title ="Month"),
+         yaxis = list(title = "Percentage",
+                    range = c(0,100)),
+         barmode = "group",
+         font = list(family = "Arial", size = 12),
+        legend = list(orientation = 'h', y=-.25))
+```
+
+**POINT IN TIME ANALYSIS BROKE WITH UPDATE TO CEDRS EXPORT FOR BREAKTHROUGH**
+
+```{r label=VaxEfficacyCDPHE_pointINtime}
+# source("point_in_time_ve.R")
+# 
+# efficacy %>% 
+#   mutate(efficacy = round(efficacy*100,2)) %>%
+#   filter(week>="2021-02-01") %>%
+#   left_join((ConfProbCases %>%
+#               group_by(AttributionWeekStart) %>%
+#               summarise(NumberCases = n()) %>%
+#               right_join((Calendar %>%
+#                             select(WeekStart) %>%
+#                             distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+#               replace(., is.na(.), 0) %>%
+#               arrange(AttributionWeekStart) %>%
+#               filter(AttributionWeekStart<=MostRecentWeekStart&AttributionWeekStart>"2020-02-21") %>%
+#               mutate(TwoWeekCases=zoo::rollsumr(NumberCases, k = 2, fill = NA),
+#                      TwoWeekRate=(TwoWeekCases/25652*100000)) %>%
+#               mutate(TwoWeekStartDate = AttributionWeekStart-7,
+#                      TwoWeekEndDate = AttributionWeekStart+6)), by = c("week" = "AttributionWeekStart")) %>%
+#   plot_ly(x = ~week,
+#          y = ~efficacy,
+#          type = "scatter",
+#          mode = "lines",
+#          color = I("#4E2B1F"),
+#          name = "Vaccine Efficacy") %>%
+#   add_trace(x = ~week,
+#             y = ~TwoWeekCases,
+#             type = "scatter",
+#             name = "Two Week (14 day) Case Count",
+#             color = I("#BB4628"),
+#             mode = "lines",
+#             yaxis = "y2") %>%
+#   layout(margin = list(l=50,r=50,h=100),
+#          title = list(text = "Point in Time Vaccine Efficacy by Week as Compared to Case Counts"),
+#          xaxis = list(title ="Week Start"),
+#          yaxis = list(title = "Vaccine Efficacy",
+#                     range = c(0,100)),
+#          yaxis2 = list(title = "Weekly Sum Cases",
+#                        side = "right",
+#                        overlaying = "y",
+#                        rangemode = "tozero",
+#                        showgrid = F),
+#          font = list(family = "Arial", size = 12),
+#          legend = list(orientation = 'h', y=-.25))
+
+```
+The chart above would be more meaningful in biweekly or monthly aggregation. This is based upon code from CDPHE and I will need to do some re-working to change to a less granular aggregation.
+
+```{r label=VaxBreakthroughDemos}
+VaxBreakthroughList %>%
+  left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+  group_by(Gender) %>%
+  count() %>%
+  kable(caption = "Gender Breakdown of Vaccine Breakthrough Cases")
+
+VaxBreakthroughList %>%
+  left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+  group_by(AgeGrouping) %>%
+  count() %>%
+  mutate(Percentage = scales::percent(n/(VaxBreakthroughList %>% count() %>% pull()))) %>%
+  kable(caption = "Age Breakdown of Vaccine Breakthrough Cases")
+
+VaxBreakthroughList %>%
+  left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+  group_by(TransmissionType) %>%
+  count() %>%
+  kable(caption = "Source of Exposure of Vaccine Breakthrough Cases")
+
+VaxBreakthroughList %>%
+  left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+  group_by(outbreak_yn) %>%
+  count() %>%
+  kable(caption = "Outbreak Connection for Vaccine Breakthrough Cases")
+```
+
+```{r label=VaxBreaktrhoughDOSES}
+DoseInfoVaxBreakthrough %>%
+  group_by(vaccination_code) %>%
+  count() %>%
+  left_join(PtIZ %>%
+              group_by(vaccination_code) %>%
+              summarise(Total = n()), by = "vaccination_code") %>%
+  mutate("Percent of Doses"= (n/Total)*100) %>%
+  kable(caption = "Doses Associated with Vaccine Breakthrough by Manufacturer")
+
+DoseInfoVaxBreakthrough %>%
+  group_by(clinic_desc) %>%
+  count() %>%
+  left_join(PtIZ %>%
+              group_by(clinic_desc) %>%
+              summarise(Total = n()), by = "clinic_desc") %>%
+  mutate("Percent of Doses"= (n/Total)*100) %>%
+  kable(caption = "Doses Associated with Vaccine Breakthrough by Clinic")
+```
+
+## Test Type  
+On 12/1/2020, CDPHE anecdotally quoted that 5% of cases were determined by antigen test. The following tables give estimates for the proportion of Routt County cases with a test result that are determined by antigen versus PCR (first table) and the proportion of tests performed that are antigen versus PCR (second table).  
+```{r label=AntigenPCRcases}
+ConfProbCases %>%
+  filter(!is.na(Spec1_CollectionDate)) %>%
+  group_by(CaseStatus) %>%
+  count() %>%
+  mutate(TotalCasesWithTests = (ConfProbCases %>%
+                                  filter(!is.na(Spec1_CollectionDate)) %>%
+                                  count() %>%
+                                  pull()),
+         PercentageCases = scales::percent(n/TotalCasesWithTests)) %>%
+  kable(caption = "Proportion of Cases Determined by Antigen (Probable) vs PCR (Confirmed)")
+
+```
+
+```{r label=AntigenPCRtests}
+NonAntibodyTests %>%
+  group_by(TestTypeGroup) %>%
+  count() %>%
+  mutate(TotalTests = (NonAntibodyTests %>%
+                         count() %>%
+                         pull()),
+         PercentageCases = scales::percent(n/TotalTests)) %>%
+  kable(caption = "Proportion of Antigen vs PCR Tests")
+
+```
+
+```{r label=Cases}
+ConfProbCases %>%
+  filter(!is.na(Spec1_CollectionDate)) %>%
+  group_by(AttributionWeekStart, Spec1_Test1_Name) %>%
+  summarise(Count = n()) %>%
+  filter(Spec1_Test1_Name %in% c("RT-PCR", "Antigen for COVID-19")) %>%
+  pivot_wider(names_from = Spec1_Test1_Name, values_from = Count) %>%
+  mutate(TotalCases = sum(`RT-PCR`,`Antigen for COVID-19`, na.rm=TRUE),
+         ProportionPCR = `RT-PCR`/TotalCases,
+         ProportionAntigen = `Antigen for COVID-19`/TotalCases) %>%
+  right_join((Calendar %>%
+                select(WeekStart) %>%
+                distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionWeekStart<=MostRecentWeekStart) %>%
+  arrange(AttributionWeekStart) %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~ProportionPCR,
+            type = "bar",
+            name = "PCR",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~ProportionAntigen,
+            type = "bar",
+            name = 'Antigen',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~TotalCases,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Total Weekly Case Count',
+            yaxis = "y2") %>%
+  layout(title = "Weekly Proportion of Antigen and PCR Cases (bars)",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "Weekly Number of Cases",
+           rangemode = "tozero",
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25)) 
+```
+
+
+
+## Exposure Type: Residents  
+**NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home. Travel is used in instances in which a resident or visitor acquired the virus while traveling outside of Routt County. There are two sub-categories: known contact with a confirmed case while traveling and no known contact with a positive case while traveling.  
+Most Recent Two Weeks: **`r (DataThroughDate-13) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=TransmissionTypeResidents}
+PHtracking %>%
+  filter(`Resident or No`=="Resident", AttributionWeekStart>="2020-10-12",AttributionDate<=(DataThroughDate)) %>%
+  group_by(ExposureCatCollapse) %>%
+  summarise(AllCasesCount = n()) %>%
+  mutate(AllCasesTotal = (PHtracking %>%
+                            filter(`Resident or No`=="Resident", AttributionWeekStart>="2020-10-12",AttributionDate<=(DataThroughDate)) %>%
+                            summarise(total = n()) %>%
+                            pull())) %>%
+  left_join((PHtracking %>%
+               filter(`Resident or No`=="Resident", IsMostRecent2WeeksRolling=="Yes") %>%
+               group_by(ExposureCatCollapse) %>%
+               summarise(MostRecentCount = n()) %>%
+               mutate(MostRecentTotal = PHtracking %>%
+                        filter(`Resident or No`=="Resident", IsMostRecent2WeeksRolling=="Yes") %>%
+                        summarise(total = n()) %>%
+                        pull())), by = "ExposureCatCollapse") %>%
+  mutate(AllCasesPercent = round(AllCasesCount/AllCasesTotal,4)*100,
+         MostRecentPercent = round(MostRecentCount/MostRecentTotal,4)*100,
+         ExposureCatCollapse=fct_drop(ExposureCatCollapse)) %>%
+plot_ly(x = ~ExposureCatCollapse, 
+        y = ~MostRecentPercent,
+        name = "Resident Cases Most Recent Two Weeks",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  add_trace(x = ~ExposureCatCollapse,
+            y = ~AllCasesPercent,
+            name = "Resident Cases Since October 12, 2020",
+            type = "bar",
+            marker = list(color = "#4E2B1F")) %>%
+  layout(title = "Percentage of Cases by Exposure Grouping of Resident Cases",
+         xaxis = list(title = "Exposure Category"),
+         yaxis = list(title = "Percentage"),
+         font = list(family = "Arial", size = 12))
+```
+
+
+### Temporal Trends in Exposure Type  
+Temporal trends in exposure for residents is available in the <a href="https://routtco-publichealth.shinyapps.io/ReactiveCOVID19_Internal/">Routt County COVID-19 Reactive Shiny App</a>.
+
+
+## Exposure Type: Visitors  
+**NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home. Travel is used in instances in which a resident or visitor acquired the virus while traveling outside of Routt County. There are two sub-categories: known contact with a confirmed case while traveling and no known contact with a positive case while traveling.  
+Most Recent Two Weeks: **`r (DataThroughDate-13) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+
+```{r label=TransmissionTypeVisitors}
+PHtracking %>%
+  filter(`Resident or No`=="Visitor", AttributionWeekStart>="2020-10-12",AttributionDate<=(DataThroughDate)) %>%
+  group_by(ExposureCatCollapse) %>%
+  summarise(AllCasesCount = n()) %>%
+  mutate(AllCasesTotal = (PHtracking %>%
+                            filter(`Resident or No`=="Visitor", AttributionWeekStart>="2020-10-12",AttributionDate<=(DataThroughDate)) %>%
+                            summarise(total = n()) %>%
+                            pull())) %>%
+  left_join((PHtracking %>%
+               filter(`Resident or No`=="Visitor", IsMostRecent2WeeksRolling=="Yes") %>%
+               group_by(ExposureCatCollapse) %>%
+               summarise(MostRecentCount = n()) %>%
+               mutate(MostRecentTotal = PHtracking %>%
+                        filter(`Resident or No`=="Visitor", IsMostRecent2WeeksRolling=="Yes") %>%
+                        summarise(total = n()) %>%
+                        pull())), by = "ExposureCatCollapse") %>%
+  mutate(AllCasesPercent = round(AllCasesCount/AllCasesTotal,4)*100,
+         MostRecentPercent = round(MostRecentCount/MostRecentTotal,4)*100,
+         ExposureCatCollapse=fct_drop(ExposureCatCollapse)) %>%
+plot_ly(x = ~ExposureCatCollapse, 
+        y = ~MostRecentPercent,
+        name = "Visitor Cases Most Recent Two Weeks",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  add_trace(x = ~ExposureCatCollapse,
+            y = ~AllCasesPercent,
+            name = "Visitor Cases Since October 12, 2020",
+            type = "bar",
+            marker = list(color = "#4E2B1F")) %>%
+  layout(title = "Percentage of Cases by Exposure Grouping of Visitor Cases",
+         xaxis = list(title = "Exposure Category"),
+         yaxis = list(title = "Percentage"),
+         font = list(family = "Arial", size = 12))
+```
+
+## Schools  
+
+### Cases  
+```{r label=CasesUnder20}
+ConfProbCases %>%
+  filter(AgeGrouping %in% c("0-9", "10-19"), AttributionDate<=(DataThroughDate)) %>%
+  group_by(AgeGrouping) %>%
+  summarise(NumberCases = n()) %>%
+  arrange(AgeGrouping) %>%
+  mutate(PercentAllCases=round((NumberCases/(ConfProbCases %>%
+                                        filter(AgeGrouping %in% c("0-9", "10-19"), AttributionDate<=(DataThroughDate)) %>%
+                                        count() %>%
+                                        pull()))*100,2),
+         text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PercentAllCases,"<br>Case Count: ",NumberCases)) %>%
+plot_ly(x = ~AgeGrouping,
+  y = ~PercentAllCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "All Cases",
+  text = ~text,
+  hoverinfo = "text") %>%
+  add_trace(data = data.frame(Pop=c(2603,3195), 
+                              AgeGrouping=as.factor(c("0-9","10-19"))) %>%
+              mutate(PopPercent=round((Pop/5798)*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PopPercent,"<br>Case Count: ",Pop)),
+            x = ~AgeGrouping,
+            y = ~PopPercent,
+            type = "bar",
+            color = I("#4E2B1F"),
+            name = "Routt County Population",
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  add_trace(data = ConfProbCases %>%
+              filter(
+                IsMostRecent2WeeksRolling=="Yes") %>%
+              group_by(AgeGrouping) %>%
+              summarise(NumberCases2Weeks = n()) %>%
+              right_join(data.frame(AgeGrouping=
+                                      c("0-9", "10-19")),
+                         by = c("AgeGrouping")) %>%
+              group_by(AgeGrouping) %>%
+              replace(., is.na(.), 0) %>%
+              arrange(AgeGrouping) %>%
+              mutate(Percent2WeekCases=round((NumberCases2Weeks/(ConfProbCases %>%
+                                                                   filter(IsMostRecent2WeeksRolling=="Yes") %>%
+                                                                   count() %>%
+                                                                   pull()))*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",Percent2WeekCases,"<br>Case Count: ",NumberCases2Weeks)),
+            x = ~AgeGrouping,
+            y = ~Percent2WeekCases,
+            type = "bar",
+            name = "Most Recent Two Weeks' Cases",
+            color = I("#477691"),
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Age Distribution Cases Age 0-19 and Most Recent \n Two Weeks' Cases Compared to Routt County Population",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+```
+
+```{r label=CasesUnder20Table}
+ConfProbCases %>%
+  filter(Age<18, AttributionDate<=(DataThroughDate)) %>%
+  mutate(DxTimeCat = case_when(AttributionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                               TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+  group_by(AgeGrouping, DxTimeCat) %>%
+  summarise(NumberCases = n()) %>%
+  mutate("Age Group" = case_when(AgeGrouping=="0-9" ~ "0-9",
+                                 TRUE ~ as.character("10-17"))) %>%
+  ungroup() %>%
+  select("Age Group", "Positive Test Time Frame" = DxTimeCat, "Number of Cases" = NumberCases) %>%
+  kable(caption = "Number of Cases Before and After Start of Academic Year, by Age Group")
+```
+
+Incidence Rate is grouped by age category of under 20 and all cases because we do not have population estimate for just under 18 years old for Routt County.
+  
+```{r label = incidence}
+ConfProbCases %>%
+  filter(AgeGrouping %in% c("0-9", "10-19")) %>%
+  summarise(cases = n()) %>%
+  mutate(AgeGroup = "Under20", Pop = 5798, Incidence = round((cases/Pop*1000),2)) %>%
+  select(-cases) %>%
+  rbind(ConfProbCases %>%
+              summarise(cases = n()) %>%
+              mutate(AgeGroup = "All", Pop = RouttPop, Incidence = round((cases/Pop*1000),2)) %>%
+              select(-cases)) %>%
+  kable(caption = "Incidence Rate by Age Group")
+```
+
+### Tests  
+
+```{r label=tests0to17}
+NonAntibodyTests %>%
+  filter(AgeAtCollection<18, CollectionDate<=(DataThroughDate)) %>%
+  mutate(TestTimeCat = case_when(CollectionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                               TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+  group_by(CollectionWeekStart) %>%
+  summarise(Count = n()) %>%
+plot_ly(
+  x = ~CollectionWeekStart,
+  y = ~Count,
+  name = "Tests",
+  type = "bar",
+  marker = list(color = "#BB4628")) %>%
+add_trace(data = ConfProbCases %>%
+            filter(Age<18, AttributionDate<=(DataThroughDate)) %>%
+            mutate(DxTimeCat = case_when(AttributionDate<"2020-08-15" ~ "Before Start of 2020-2021 Academic Year",
+                                         TRUE ~ as.character("After Start of 2020-2021 Academic Year"))) %>%
+            group_by(AttributionWeekStart) %>%
+            summarise(NumberCases = n()),
+  x = ~AttributionWeekStart,
+            y = ~NumberCases,
+            name = "Cases",
+            type = "bar",
+            marker = list(color = "#4E2B1F")) %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      tickangle = 45,
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)"),
+       yaxis = list(title = "Number of Tests",
+                    rangemode = "tozero",
+                    dtick = 25),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+```
+
+```{r label=YouthPositivity}
+ConfProbCases %>%
+  filter(Age<18) %>%
+  filter(AgeGrouping %in% c("0-9", "10-19")) %>%
+  group_by(AgeGrouping, AttributionWeekStart) %>%
+  summarise(Cases = n()) %>%
+  left_join(NonAntibodyTests %>%
+              filter(AgeAtCollection<18) %>%
+              filter(AgeGrouping %in% c("0-9", "10-19")) %>%
+              group_by(AgeGrouping, CollectionWeekStart) %>%
+              summarise(Tests = n()),
+            by = c("AgeGrouping", "AttributionWeekStart" = "CollectionWeekStart")
+            ) %>%
+  mutate(WeeklyPositivity = round((Cases/Tests)*100,2)) %>%
+  select(AgeGrouping, AttributionWeekStart, WeeklyPositivity) %>%
+  pivot_wider(names_from = AgeGrouping, values_from = WeeklyPositivity) %>%
+  arrange(AttributionWeekStart) %>%
+plot_ly(
+  x = ~AttributionWeekStart,
+  y = ~`0-9`,
+  type = "scatter",
+  mode = "line",
+  line = list(color = '#4E2B1F'),
+  name = 'Positivity Rate, 0-9') %>%
+add_trace(y = ~`10-19`,
+  type = "scatter",
+  mode = "line",
+  line = list(color = '#BB4628'),
+  name = 'Positivity Rate, 10-17') %>%
+  layout(title = "Weekly Positivity Rate Among School-Age Residents",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      tickangle = 45,
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Percent Positivity"),
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25)) 
+
+```
+
+
+# All Cases Summary   
+This section summarizes the demographics of Routt County cases by providing both the totals for all cases as well as a summary for the last two weeks' cases. Statistics for all cases to date are compared to the Routt County population.  
+
+## Age  
+Most Recent Two Weeks: **`r (DataThroughDate-13) %>% format('%B %d, %Y')` through `r (DataThroughDate) %>% format('%B %d, %Y')`**.  
+  
+```{r label=Age2WeeksAllCasesCountyCompare}
+ConfProbCases %>%
+  # filter(CountsTowardTotal=="Yes") %>%
+  group_by(AgeGrouping) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(data.frame(AgeGrouping=
+                          c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+")),
+             by = c("AgeGrouping")) %>%
+  group_by(AgeGrouping) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AgeGrouping) %>%
+  mutate(PercentAllCases=round((NumberCases/(ConfProbCases %>%
+                                        filter(AttributionDate<=(DataThroughDate)) %>%
+                                        count() %>%
+                                        pull()))*100,2),
+         text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PercentAllCases,"<br>Case Count: ",NumberCases)) %>%
+plot_ly(x = ~AgeGrouping,
+  y = ~PercentAllCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "All Cases",
+  text = ~text,
+  hoverinfo = "text") %>%
+  add_trace(data = data.frame(Pop=c(2603,3195,2834,4223,3919,3308,3270,1937,553,109), 
+                              AgeGrouping=as.factor(c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89","90+"))) %>%
+              mutate(PopPercent=round((Pop/25951)*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PopPercent,"<br>Case Count: ",Pop)),
+            x = ~AgeGrouping,
+            y = ~PopPercent,
+            type = "bar",
+            color = I("#4E2B1F"),
+            name = "Routt County Population",
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  add_trace(data = ConfProbCases %>%
+              filter(
+                # CountsTowardTotal=="Yes", 
+                IsMostRecent2WeeksRolling=="Yes") %>%
+              group_by(AgeGrouping) %>%
+              summarise(NumberCases2Weeks = n()) %>%
+              right_join(data.frame(AgeGrouping=
+                                      c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89","90+")),
+                         by = c("AgeGrouping")) %>%
+              group_by(AgeGrouping) %>%
+              replace(., is.na(.), 0) %>%
+              arrange(AgeGrouping) %>%
+              mutate(Percent2WeekCases=round((NumberCases2Weeks/(ConfProbCases %>%
+                                                                   filter(IsMostRecent2WeeksRolling=="Yes") %>%
+                                                                   count() %>%
+                                                                   pull()))*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",Percent2WeekCases,"<br>Case Count: ",NumberCases2Weeks)),
+            x = ~AgeGrouping,
+            y = ~Percent2WeekCases,
+            type = "bar",
+            name = "Most Recent Two Weeks' Cases",
+            color = I("#477691"),
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Age Distribution All Cases and Most Recent \n Two Weeks' Cases Compared to Routt County Population",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+
+```
+
+
+## Gender  
+
+```{r label=GenderCasesPieChart2weeks}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            filter(IsMostRecent2WeeksRolling=="Yes") %>%
+            group_by(Gender) %>%
+            count(),
+          labels = ~Gender, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          name = "Cases",
+          title = "Cases",
+          domain = list(row = 0, column = 0)) %>%
+  layout(margin = list(t=35,b=15),
+         title = list(text =  paste0("<b>Most recent two reporting weeks: </b><br>",format((DataThroughDate-13),'%B %d, %Y')," through ",
+                              format((DataThroughDate),'%B %d, %Y')),
+                      font = list(family = "Arial", size = 14),
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 10),
+                      y = 1
+                      ),
+         height = "350",
+         width = "500")
+```
+```{r label=GenderCasesPieChartAll}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            filter(AttributionDate<=(DataThroughDate)) %>%
+            group_by(Gender) %>%
+            count(),
+          labels = ~Gender, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          name = "Cases",
+          title = "Cases",
+          domain = list(row = 0, column = 0)) %>%
+  add_pie(data = data.frame(Pop=c(12291,13393), Gender=as.factor(c("Female","Male"))),
+          labels = ~Gender, values = ~Pop,
+          marker = list(colors = c('#4E2B1F','#BB4628')),
+          sort = FALSE,
+          name = "Population",
+          title = "Population",
+          domain = list(row = 0, column = 1)) %>%
+  layout(margin = list(t=25,b=15),
+         title = list(text = "Gender Breakdown of COVID-19 Cases Compared to Routt County Population",
+                      font = list(family = "Arial", size = 14)),
+         grid=list(rows=1, columns=2))
+```
+
+
+## Race  
+```{r label=RaceCasesPieChartAll}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            filter(AttributionDate<=(DataThroughDate)) %>%
+            group_by(Ethnicity) %>%
+            count(),
+          labels = ~Ethnicity, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          name = "Cases",
+          title = "Cases",
+          domain = list(row = 0, column = 0)) %>%
+  # add_pie(data = data.frame(Pop=c(12291,13393), Gender=as.factor(c("Female","Male"))),
+  #         labels = ~Gender, values = ~Pop,
+  #         marker = list(colors = c('#4E2B1F','#BB4628')),
+  #         sort = FALSE,
+  #         name = "Population",
+  #         title = "Population",
+  #         domain = list(row = 0, column = 1)) %>%
+  layout(margin = list(t=25,b=15),
+         title = list(text = "Ethnicity Breakdown of COVID-19 Cases",
+                      font = list(family = "Arial", size = 14)),
+         grid=list(rows=1, columns=2))
+```
+
+## Geographic Distribution of Cases  
+Cases are attributed based upon address provided when tested and subsequently interviewed. Data may be skewed due to the use of PO Boxes.    
+ 
+```{r label=GeoCasesPerCapita}
+ConfProbCases %>%
+  mutate(ZIP = str_sub(ZipCode, 1,5),
+         ZIPgroup = case_when(ZIP %in% c("80428", "80467", "80469", "80477", "80479", "80483", "80487", "80488", "81639") ~ "Routt",
+                              TRUE ~ as.character("Incomplete")),
+         City = case_when(ZIP %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          ZIP=="80428" ~ "North Routt",
+                          ZIP=="80467" ~ "South ROutt",
+                          ZIP=="80469" ~ "South Routt",
+                          ZIP=="80479" ~ "South Routt",
+                          ZIP=="80483" ~ "South Routt",
+                          ZIP=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete"))) %>%
+  group_by(City) %>%
+  filter(AttributionDate<=(DataThroughDate)) %>%
+  summarise(NumberCases = n()) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate(TotalCases = ConfProbCases %>%
+           filter(!is.na(ZipCode)) %>%
+           count() %>%
+           pull(),
+         TotalPop = 23509,
+         CasesPerCapita = round(NumberCases/Pop,4)*100000) %>%
+plot_ly(x = ~City, 
+        y = ~CasesPerCapita,
+        name = "Cases",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  layout(title = "Per Capita Cumulative Incidence",
+         xaxis = list(title = "City"),
+         yaxis = list(title = "Incidence Rate per 100,000"),
+         shapes = list(
+              list(type = 'line',
+                   xref = 'paper', x0=0, x1=1,
+                   yref = 'y', y0=(ConfProbCases %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/RouttPop)*100000,2)) %>%
+                                     pull(CummInc)), y1=(ConfProbCases %>%
+                                                           count() %>%
+                                                           mutate(CummInc=round((n/RouttPop)*100000,2)) %>%
+                                                           pull(CummInc)),
+                   line = list(color = '#4E2B1F'))),
+         annotations = list(
+           list(x = .5,
+                y = (ConfProbCases %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/RouttPop)*100000*1.03,2)) %>%
+                                     pull(CummInc)),
+                text = "Routt County Cumulative Incidence",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE)),
+         font = list(family = "Arial", size = 12))
+
+```
+
+```{r label=GeoCasesPerCapita2weeks}
+ConfProbCases %>%
+  mutate(ZIP = str_sub(ZipCode, 1,5),
+         ZIPgroup = case_when(ZIP %in% c("80428", "80467", "80469", "80477", "80479", "80483", "80487", "80488", "81639") ~ "Routt",
+                              TRUE ~ as.character("Incomplete")),
+         City = case_when(ZIP %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          ZIP=="80428" ~ "North Routt",
+                          ZIP=="80467" ~ "South ROutt",
+                          ZIP=="80469" ~ "South Routt",
+                          ZIP=="80479" ~ "South Routt",
+                          ZIP=="80483" ~ "South Routt",
+                          ZIP=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete"))) %>%
+  group_by(City) %>%
+  filter(AttributionDate<=(DataThroughDate)&IsMostRecent2WeeksRolling=="Yes") %>%
+  summarise(NumberCases = n()) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate(TotalCases = ConfProbCases %>%
+           filter(!is.na(ZipCode)) %>%
+           count() %>%
+           pull(),
+         TotalPop = 23509,
+         CasesPerCapita = round(NumberCases/Pop,4)*100000) %>%
+plot_ly(x = ~City, 
+        y = ~CasesPerCapita,
+        name = "Cases",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  layout(title = "Per Capita 14-day Incidence",
+         xaxis = list(title = "City"),
+         yaxis = list(title = "Incidence Rate per 100,000"),
+         shapes = list(
+              list(type = 'line',
+                   xref = 'paper', x0=0, x1=1,
+                   yref = 'y', y0=(ConfProbCases %>%
+                                     filter(AttributionDate<=(DataThroughDate)&IsMostRecent2WeeksRolling=="Yes") %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/RouttPop)*100000,2)) %>%
+                                     pull(CummInc)), y1=(ConfProbCases %>%
+                                                           filter(AttributionDate<=(DataThroughDate)&IsMostRecent2WeeksRolling=="Yes") %>%
+                                                           count() %>%
+                                                           mutate(CummInc=round((n/RouttPop)*100000,2)) %>%
+                                                           pull(CummInc)),
+                   line = list(color = '#4E2B1F'))),
+         annotations = list(
+           list(x = .5,
+                y = (ConfProbCases %>%
+                       filter(AttributionDate<=(DataThroughDate)&IsMostRecent2WeeksRolling=="Yes") %>%
+                       count() %>%
+                       mutate(CummInc=round((n/RouttPop)*100000*1.03,2)) %>%
+                       pull(CummInc)),
+                text = "Routt County 14-day Incidence",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE)),
+         font = list(family = "Arial", size = 12))
+
+```
+
+
+## Table of Cases  
+Click "Download" to download this table as a PDF, Excel or CSV file.  
+This table includes all confirmed cases and all probable cases.  
+```{r label=WebsiteSpreadsheetPrep, results='hide'}
+#include probables for which there is a positive antigen, but not other probables
+WebsiteCasesTablePrep <- expand_grid(#AgeGrouping = c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89","90+"), 
+                                     AttributionDate = Calendar$date)
+
+WebsiteCasesTable <- ConfProbCases %>%
+  select(EventID, CaseStatus, ReportedDate, Gender, AgeGrouping, ReportedDateWeek, ReportedWeekStart, CollectionDateWeek,
+         CollectionWeekStart, IsMostRecent2Weeks, AttributionDate) %>%
+  group_by(AttributionDate) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(WebsiteCasesTablePrep, by = "AttributionDate") %>%
+  arrange(AttributionDate) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate<=(DataThroughDate)) 
+
+# # custom table container for website table
+# WebsiteTableSketch = htmltools::withTags(table(
+#   class = 'display',
+#   thead(
+#     tr(
+#       th(rowspan = 2, 'Date'),
+#       th(colspan = 11, 'Female'),
+#       th(colspan = 11, 'Male'),
+#       th(rowspan = 2, "Grand Total")
+#     ),
+#     tr(
+#       lapply(rep(c('0-9','10-19','20-29','30-39','40-49','50-59','60-69','70-79','80-89','90+','Total'), 2), th)
+#     )
+#   )
+# ))
+# print(WebsiteTableSketch)
+```
+``` {r label = createwebsitetable}
+WebsiteCasesTable %>%
+  rename("Date" = "AttributionDate") %>%
+  DT::datatable(
+    #container = WebsiteTableSketch,
+    rownames = FALSE,
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Bfrtip',
+      pageLength = 10,
+      scrollX = TRUE,
+      buttons = list(
+        'copy', 'print', list(
+          extend = 'collection',
+          buttons = c('csv', 'excel', 'pdf'),
+          text = 'Download')
+      ))
+  )
+```
+
+# References and Definitions{#Definitions} 
+## General Notes  
+Routt County Public Health presents all data (cases and tests) by the date of specimen collection. If there is no date of specimen collection, the date the case or test was reported is used. This differs from the reporting presented by CDPHE. CDPHE presents data based upon report date. This can lead to small differences in data between what is presented here and what is presented by CDPHE. You will see differences in cases per day between the state's dashboard and ours because of this difference in reporting methodology. We are using, and have always used, test collection date for our reporting because this better reflects disease onset and mirrors the start of isolation. Although our reporting methodology of using date of test collection means we are retroactively adding cases to prior dates, the advantage is that we avoid seeing artificial case spikes due to results from tests performed on different days being reported on the same day.
+  
+Cases are attributed to Routt County based upon the primary residence of the case. This means that short and long-term visitors to the county who are tested here are excluded from our charts. These cases are attributed to the individual's county of residence (in Colorado or another state). Similarly, if a Routt County residents tests positive in another state or county, they will be included in our case counts. Additionally, college and university students who have primary residence at the location of their college or university are attributed to the county of their college/university rather than Routt County.  
+  
+## Updates by Date  
+**September 29, 2021**: Updated PCR Test Result Delay graph to group together all labs used by Routt County testing providers.  
+Updated data source for symptom information to more accurately account for missing data, moving from the CEDRS to the State of Colorado's contact tracing software, Dr. Justina.  
+**September 14, 2021**: Added incidence for school-age and non-school age residents  
+**July 16, 2021**: Added Vaccine Breakthrough section with data on cases among fully vaccinated residents.  
+Added 14-day incidence rate by geography.  
+**June 25, 2021**: Added vaccination rates by geography.  
+**June 9, 2021**: Added 12 and older breakdown for vaccinations, consistent with the currently vaccine-eligible population.  
+**April 20, 2021**: Changed all graphs from CDPHE Dial Framework to Routt's Road to Recovery. Substantial updates made to graphs that show incidence and positivity. Removed graphs that present data in ways no longer relevant. Additional updates made to introductory table of metrics, key metrics section, and vaccinations section.   
+**April 6, 2021**: Updated PCR Test Result Delay graph to group together all labs used by Routt County testing providers. Vaccination table updated to show all age groups (15+) and highest-risk individuals (those aged 70+) to align with vaccine eligibility. While Phase 2 opens vaccine eligibility to everyone age 16+, population data for Routt County is only available for age 15+.    
+**March 25, 2021**: Updated dashboard to align with Dial 3.0 that was released March 24 by CDPHE. Changes include increasing the upper threshold for Level Green incidence to 35 per 100,000. The Dial 2.0 graphic was replaced by a Dial 3.0 graphic.  
+**March 7, 2021**: Changed vacciantion data to capture single and 2-dase vaccines. Counts of "received one dose" include those who have received 1 dose of a 2-dose vaccine and those who have received a single dose of a 1-dose vaccine. Counts of "fully vaccinated" includes those who have received 2 doses of a 2-dose vaccine and those who have received one dose of a 1-dose vaccine.  
+**February 9, 2021**: Updated data source for hospitalizations.  
+**Februrary 7, 2021**: Updated dashboard to align with Dial 2.0 that was released on February 6 by CDPHE.  
+Changes include adding a second "key metrics" graphic for Dial 2.0, adding 7-day incidence thresholds to the Cases Per Week graph, removing thresholds from the 14-day incidence graph, and updating the positivity and tests per day graph to use 7-day averages and include the updated positivity thresholds.  
+The Dial 1.0 key metrics graphic remains for comparison purposes.  
+**February 4, 2021**: Updated COVID-19 Vaccination section to include age-specific information.  Updated outbreak bar chart to show all outbreaks since September 1, 2020 as well as just those from the past 4 weeks and changed to be a proportion of outbreaks rather than count.  Added disclaimer on charts: "data prepared by Routt County Public Health".  
+**February 2, 2021**: Added COVID-19 Vaccination section that includes the number of Routt County residents who have received at least one dose of a COVID-19 vaccine and the total number of doses received by Routt County residents.  
+**December 22, 2020**: Updated outbreak categories to better align with categories used by CDPHE.  
+Changed outbreak pie chart to a histogram to better display the information.  
+**December 15, 2020**: Added +/- 5% error bars to 7-day and 14-day incidence graphs to provide an indication of meaningful difference.  
+**December 6, 2020**: Added box and whisker plot of outbreak-associated cases.  
+Changed geographic distribution of cases graph to show per capita cumulative incidence.  
+Added more descriptive hover text for 14-Day Incidence graph.  
+Added Test Results Delay graph back to dashboard. Updated to account for changes to labs used by various providers.  
+**December 3, 2020**: Updated hospitalizations Key Metrics figure to align with update to the state's COVID-19 dial dashboard.  
+**December 1, 2020**: Added a graph of the proportion of cases that are symptomatic versus asymptomatic.  
+**November 29, 2020**: Added weekly case count of Long-Term Care Facility resident cases to Number of Cases per Week graph.  
+Added chart of number of people associated with outbreaks in addition to the number of outbreaks to the [Outbreaks](#Outbreaks) section.  
+**November 20, 2020**: Updated reporting frequency and timeline. Dashboard will now be updated three times per week. All graphs representing weekly data continue to present data through the most recent completed reporting week (Monday through Sunday). All graphs presenting daily data along with the Key Metrics include data through two days prior to present.  
+Collapsed most recent week and most recent two weeks summary sections into one and presented as a table.  
+Edited references to the CDPHE Dial to align with the updated dial released November 17, 2020.  
+Added count of total COVID-19 hospitalizations to date among Routt County residents.  
+Removed graph of Test Result Delay because most tests in the county are now run through labs other than the CDPHE State Lab. Many community providers are using the UCHealth/University lab and Public Health is using a private lab.   
+**November 6, 2020**: Added geographic distribution of cases to date. Added table of case counts by attribution date.    
+**November 3, 2020**: Changed line on Weekly Number of Cases graph to be the 7-day incidence rate per 100,000. Updated deduplication process for daily test count. Added gender breakdown for last two weeks and age breakdown for all cases compared to Routt County population.    
+**October 27, 2020**: Visitor cases added to the dashboard. Routt County Public Health has complete and accurate data on visitor cases beginning September 21, 2020, so only visitor cases from this date forward are included on this dashboard. Changed the calculation for test positivity rate to be total number of cases in most recent 14 days divided by total number of tests in most recent 14 days. This update affects the positivity graph *but not* the key metrics positivity rate.  
+**October 13, 2020**: New dashboard was first published.    
+**September 21, 2020**: Routt County Public Health began adding antigen tests into the count of tests performed in the community.  
+**August 17, 2020**: Antigen positive test results added to the case definition for probable cases. All antigen positive test results after this date are included as probable cases in our case counts.  
+
+## Definitions  
+**Cases** - all confirmed and probable cases are included in case counts. We are not including suspect cases. Antigen positive tests are included as a probable case for antigen tests completed on or after August 17, 2020. Routt County Public Health follows the case definition used by the Colorado department of Public Health and Environment, which is available here: <a href="https://docs.google.com/document/d/1e-IWLtzJNCgI2gzPONGvEASGgse85WuBmcToc9ev-74/edit " target="_blank">https://docs.google.com/document/d/1e-IWLtzJNCgI2gzPONGvEASGgse85WuBmcToc9ev-74/edit </a>   
+**CDPHE** - Colorado Department of Public Health and Environment  
+**Completed Vaccination Series**: A common term for describing that an individual has received all necessary doses of a vaccination series. This is often used in describing childhood immunizations that require multiple doses. There are COVID-19 vaccines that require only one dose as well as vaccines that require two doses. Having "completed the COVID-19 vaccination series" means an individual has received both doses of a 2-dose vaccine or one dose of a single-dose vaccine.  
+**Fully Vaccinated**: An individual is fully vaccinated when a full 14 days have passed since they completed the COVID-19 vaccination series. More information: <a href="https://www.cdc.gov/coronavirus/2019-ncov/vaccines/fully-vaccinated.html" target="_blank">https://www.cdc.gov/coronavirus/2019-ncov/vaccines/fully-vaccinated.html</a>    
+**Incidence** - Incidence is the number of new cases of a disease for a specific time period. Sometimes it is presented as a rate (incidence rate), such as the number of cases per 100,000 population. Incidence rates are helpful in comparing different communities to each other.  
+**Outbreak** - outbreak status is determined by epidemiologic case definition. Through June 30, 2021, an outbreak was defined as two or more cases of COVID-19 among non-household members associated with the same event or facility within a 14-day period. Beginning July 1, 2021, CDPHE updated the outbreak definition such that an outbreak in any setting other than residential care facilities or corrections requires at least 5 non-household members. Two or more cases in residential care facilities or corrections continues to meet outbreak definition.  
+**Resident** - Individuals whose permanent address is in Routt County, excluding college students who are attending school outside of Routt County. Resident cases also includes individuals who reside in Routt County at least 6 months of the year.   
+**School-age**: anyone 5 through 17 years old, inclusive, at the time of case report.  
+**Tests** - there are many tests for COVID-19 that each fall into one of three categories: PCR, antigen, or antibody. Both PCR and antigen tests are used to diagnose active COVID-19 infections. PCR tests detect  viral genetic material, while antigen tests detect viral proteins. Antibody tests identify previous infections. We include both PCR and antigen tests (beginning September 21, 2020) in our total tests counts.  
+**Test Positivity** - a measure of the proportion of tests conducted that result in a positive test. PCR tests are generally used for this metric. We are using both PCR tests and antigen tests (beginning September 21, 2020) for the denominator of this percentage. The numerator is the number of people who tested positive.  
+**Visitor** - Individuals who received a COVID-19 test from a Routt County provider and spent time in Routt County while infectious.

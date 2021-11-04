@@ -1,0 +1,216 @@
+---
+title: "Surveillance - Vaccine Efficacy"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Vaccine Efficacy and Breakthrough Cases  
+Clinical trials for COVID-19 vaccines were designed to assess efficacy in preventing severe disease, hospitalization, and/or death. No vaccine is 100% effective. Therefore, we expect to see vaccine breakthrough cases, and we expect to see a small proportion of cases (5-15%) among vaccinated individuals who do develop severe disease, hospitalization, or death. 
+Vaccine breakthrough is defined as a positive COVID-19 test at least 14 days after completing the COVID-19 vaccination series. Identifying vaccine breakthrough relies upon data in CIIS as well as self-reported (and later verified) information gathered during case investigations.  
+ 
+
+```{r label=VaxBreakthroughbyMonthGraph3, eval = params$Internal}
+PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, vaccination_date) %>%
+  distinct() %>%
+  mutate(FullyVaxDate = vaccination_date+14,
+         FullyVaxDateMonth = month(FullyVaxDate)) %>%
+#  filter(FullyVaxDateMonth<month(Sys.Date(), label = TRUE), FullyVaxDateMonth!="Jan") %>%
+  group_by(FullyVaxDateMonth) %>%
+  summarise(Count = n()) %>%
+  mutate(RollingSumFullyVax = cumsum(Count),
+         FullyVaxPercent = round((RollingSumFullyVax/params$RouttPop)*100,2),
+         NotFullyVaxPercent = round(((params$RouttPop-RollingSumFullyVax)/params$RouttPop)*100,2)) %>%
+  left_join(VaxBreakthroughList %>%
+            mutate(AttributionMonth = month(AttributionDate)) %>%
+           #   filter(AttributionMonth<month(Sys.Date(), label = TRUE), AttributionMonth!="Jan") %>%
+              group_by(AttributionMonth) %>%
+              summarise(VaxBreakthrough = n()) %>%
+              left_join(ConfProbCases %>%
+                          mutate(AttributionMonth = month(AttributionDate)) %>%
+                       #   filter(AttributionMonth<month(Sys.Date(), label = TRUE), Age>11, AttributionMonth!="Jan") %>%
+                          group_by(AttributionMonth) %>%
+                          summarise(Total = n()), by = "AttributionMonth") %>%
+              mutate(VaxBreakthroughPercent = round((VaxBreakthrough/Total)*100,2)), by = c("FullyVaxDateMonth" = "AttributionMonth")) %>%
+plot_ly(
+  x = ~FullyVaxDateMonth,
+  y = ~FullyVaxPercent,
+            type = "bar",
+            name = "Fully Vaccinated",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~NotFullyVaxPercent,
+            type = "bar",
+            name = 'Not Fully Vaccinated',
+            color = I("#BB4628")) %>%
+  add_trace(y = ~VaxBreakthroughPercent,
+            type = "scatter",
+            mode = "line",
+            line = list(color = '#F2BF4C'),
+            name = 'Monthly Proportion Vaccine Breakthrough',
+            yaxis = "y2") %>%
+  layout(margin = list(l=50,r=50,h=100),
+         title = "Monthly Fully Vaccinated (brown bar) and Proportion Monthly Vaccine Breakthrough Cases (line)",
+         xaxis = list(title ="Month"),
+         yaxis = list(title = "Percentage of Cases",
+                    rangemode = "tozero"),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           overlaying = "y",
+           side = "right",
+           title = "Monthly Proportion of Vaccine Breakthrough Cases",
+           rangemode = "tozero",
+           range = c(0,100),
+           showgrid = F),
+         barmode = "stack",
+         font = list(family = "Arial", size = 12),
+         legend = list(orientation = 'h', y=-.25))
+
+```
+
+```{r label=VaxBreakthroughbyMonthGraph4}
+FullyVax %>%
+ filter(FullyVaxDateAttr>"2021-01-31") %>%
+  group_by(FullyVaxDateAttr) %>%
+  summarise(Count = n()) %>%
+  mutate(RollingSumFullyVax = cumsum(Count),
+         FullyVaxPercent = round((RollingSumFullyVax/params$RouttPop)*100,2),
+         NotFullyVaxPercent = round(((params$RouttPop-RollingSumFullyVax)/params$RouttPop)*100,2)) %>%
+  left_join(VaxBreakthroughList %>%
+             filter(AttributionDate>"2021-01-31") %>%
+              group_by(AttributionDateMonthStart) %>%
+              summarise(VaxBreakthrough = n()) %>%
+              left_join(ConfProbCases %>%
+                          mutate(AttributionMonth = as.Date(paste0(year(AttributionDate),"-",month(AttributionDate),"-01"))) %>%
+                         filter(age_at_reported>11, AttributionDate>"2021-01-31") %>%
+                          group_by(AttributionMonth) %>%
+                          summarise(Total = n()), by = c("AttributionDateMonthStart" = "AttributionMonth")) %>%
+              mutate(VaxBreakthroughPercent = round((VaxBreakthrough/Total)*100,2)), by = c("FullyVaxDateAttr" = "AttributionDateMonthStart")) %>%
+  filter(FullyVaxDateAttr<as.Date(paste0(year(Sys.Date()),"-",(month(Sys.Date())),"-01"))) %>%
+plot_ly(
+  x = ~FullyVaxDateAttr,
+  y = ~FullyVaxPercent,
+            type = "bar",
+            name = "Monthly Percentage Population Fully Vaccinated: <br># Routt County residents more than 14 days <br>beyond final dose divided by total population",
+            color = I("#4E2B1F")) %>%
+  add_trace(y = ~VaxBreakthroughPercent,
+            type = "bar",
+            color = I('#BB4628'),
+            name = 'Monthly Percentage Vaccine Breakthrough Cases: <br># vaccine breakthrough cases divided <br>by total # cases age 12+') %>%
+  layout(margin(b=500),
+         title = list(text = "Percentage Population Fully Vaccinated (brown) and <br>Percentage of Vaccine Breakthrough Cases Ages 12+ (orange), by Month"),
+         xaxis = list(title ="Month"),
+         yaxis = list(title = "Percentage",
+                    range = c(0,100)),
+         barmode = "group",
+         font = list(family = "Arial", size = 12),
+        legend = list(orientation = 'h', y=-.25))
+```
+
+
+```{r label=VaxEfficacyCDPHE_pointINtime}
+# **POINT IN TIME ANALYSIS BROKE WITH UPDATE TO CEDRS EXPORT FOR BREAKTHROUGH**
+# source("point_in_time_ve.R")
+# 
+# efficacy %>% 
+#   mutate(efficacy = round(efficacy*100,2)) %>%
+#   filter(week>="2021-02-01") %>%
+#   left_join((ConfProbCases %>%
+#               group_by(AttributionWeekStart) %>%
+#               summarise(NumberCases = n()) %>%
+#               right_join((Calendar %>%
+#                             select(WeekStart) %>%
+#                             distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
+#               replace(., is.na(.), 0) %>%
+#               arrange(AttributionWeekStart) %>%
+#               filter(AttributionWeekStart<=params$MostRecentWeekStart&AttributionWeekStart>"2020-02-21") %>%
+#               mutate(TwoWeekCases=zoo::rollsumr(NumberCases, k = 2, fill = NA),
+#                      TwoWeekRate=(TwoWeekCases/25652*100000)) %>%
+#               mutate(TwoWeekStartDate = AttributionWeekStart-7,
+#                      TwoWeekEndDate = AttributionWeekStart+6)), by = c("week" = "AttributionWeekStart")) %>%
+#   plot_ly(x = ~week,
+#          y = ~efficacy,
+#          type = "scatter",
+#          mode = "lines",
+#          color = I("#4E2B1F"),
+#          name = "Vaccine Efficacy") %>%
+#   add_trace(x = ~week,
+#             y = ~TwoWeekCases,
+#             type = "scatter",
+#             name = "Two Week (14 day) Case Count",
+#             color = I("#BB4628"),
+#             mode = "lines",
+#             yaxis = "y2") %>%
+#   layout(margin = list(l=50,r=50,h=100),
+#          title = list(text = "Point in Time Vaccine Efficacy by Week as Compared to Case Counts"),
+#          xaxis = list(title ="Week Start"),
+#          yaxis = list(title = "Vaccine Efficacy",
+#                     range = c(0,100)),
+#          yaxis2 = list(title = "Weekly Sum Cases",
+#                        side = "right",
+#                        overlaying = "y",
+#                        rangemode = "tozero",
+#                        showgrid = F),
+#          font = list(family = "Arial", size = 12),
+#          legend = list(orientation = 'h', y=-.25))
+
+```
+
+
+```{r label=VaxBreakthroughDemos, eval = params$Internal}
+#CHECK COLUMN NAMES TO MAKE THIS WORK
+#
+# VaxBreakthroughList %>%
+#   left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+#   group_by(Gender) %>%
+#   count() %>%
+#   kable(caption = "Gender Breakdown of Vaccine Breakthrough Cases")
+# 
+# VaxBreakthroughList %>%
+#   left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+#   group_by(AgeGrouping) %>%
+#   count() %>%
+#   mutate(Percentage = scales::percent(n/(VaxBreakthroughList %>% count() %>% pull()))) %>%
+#   kable(caption = "Age Breakdown of Vaccine Breakthrough Cases")
+# 
+# VaxBreakthroughList %>%
+#   left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+#   group_by(TransmissionType) %>%
+#   count() %>%
+#   kable(caption = "Source of Exposure of Vaccine Breakthrough Cases")
+# 
+# VaxBreakthroughList %>%
+#   left_join(ConfProbCases, by = c("EventID", "FirstName", "LastName", "BirthDate", "AttributionDate")) %>%
+#   group_by(outbreak_yn) %>%
+#   count() %>%
+#   kable(caption = "Outbreak Connection for Vaccine Breakthrough Cases")
+```
+
+```{r label=VaxBreaktrhoughDOSES, eval = params$Internal}
+DoseInfoVaxBreakthrough %>%
+  group_by(vaccination_code) %>%
+  count() %>%
+  left_join(PtIZ %>%
+              group_by(vaccination_code) %>%
+              summarise(Total = n()), by = "vaccination_code") %>%
+  mutate("Percent of Doses"= (n/Total)*100) %>%
+  kable(caption = "Doses Associated with Vaccine Breakthrough by Manufacturer")
+
+DoseInfoVaxBreakthrough %>%
+  group_by(clinic_desc) %>%
+  count() %>%
+  left_join(PtIZ %>%
+              group_by(clinic_desc) %>%
+              summarise(Total = n()), by = "clinic_desc") %>%
+  mutate("Percent of Doses"= (n/Total)*100) %>%
+  kable(caption = "Doses Associated with Vaccine Breakthrough by Clinic")
+```
+

@@ -1,0 +1,321 @@
+---
+title: "PCR Test Result Delay"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+# All Cases Summary   
+This section summarizes the demographics of Routt County cases by providing both the totals for all cases as well as a summary for the last two weeks' cases. Statistics for all cases to date are compared to the Routt County population.  
+
+## Age  
+Most Recent Two Weeks: **`r format((as.Date(params$DataThroughDate))-days(13),'%B %d, %Y')` through `r as.Date(params$DataThroughDate) %>% format('%B %d, %Y')`**.  
+  
+```{r label=Age2WeeksAllCasesCountyCompare}
+ConfProbCases %>%
+  # filter(CountsTowardTotal=="Yes") %>%
+  group_by(AgeGrouping) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(data.frame(AgeGrouping=
+                          c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+")),
+             by = c("AgeGrouping")) %>%
+  group_by(AgeGrouping) %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AgeGrouping) %>%
+  mutate(PercentAllCases=round((NumberCases/(ConfProbCases %>%
+                                        filter(AttributionDate<=(params$DataThroughDate)) %>%
+                                        count() %>%
+                                        pull()))*100,2),
+         text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PercentAllCases,"<br>Case Count: ",NumberCases)) %>%
+plot_ly(x = ~AgeGrouping,
+  y = ~PercentAllCases,
+  type = "bar",
+  color = I("#BB4628"),
+  name = "All Cases",
+  text = ~text,
+  hoverinfo = "text") %>%
+  add_trace(data = data.frame(Pop=c(2603,3195,2834,4223,3919,3308,3270,1937,553,109), 
+                              AgeGrouping=as.factor(c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89","90+"))) %>%
+              mutate(PopPercent=round((Pop/25951)*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",PopPercent,"<br>Case Count: ",Pop)),
+            x = ~AgeGrouping,
+            y = ~PopPercent,
+            type = "bar",
+            color = I("#4E2B1F"),
+            name = "Routt County Population",
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  add_trace(data = ConfProbCases %>%
+              filter(
+                # CountsTowardTotal=="Yes", 
+                IsMostRecent2WeeksRolling=="Yes") %>%
+              group_by(AgeGrouping) %>%
+              summarise(NumberCases2Weeks = n()) %>%
+              right_join(data.frame(AgeGrouping=
+                                      c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89","90+")),
+                         by = c("AgeGrouping")) %>%
+              group_by(AgeGrouping) %>%
+              replace(., is.na(.), 0) %>%
+              arrange(AgeGrouping) %>%
+              mutate(Percent2WeekCases=round((NumberCases2Weeks/(ConfProbCases %>%
+                                                                   filter(IsMostRecent2WeeksRolling=="Yes") %>%
+                                                                   count() %>%
+                                                                   pull()))*100,2),
+                     text=paste0("Age Grouping: ",AgeGrouping,"<br>Percentage: ",Percent2WeekCases,"<br>Case Count: ",NumberCases2Weeks)),
+            x = ~AgeGrouping,
+            y = ~Percent2WeekCases,
+            type = "bar",
+            name = "Most Recent Two Weeks' Cases",
+            color = I("#477691"),
+            text = ~text,
+            hoverinfo = "text"
+              ) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Age Distribution All Cases and Most Recent \n Two Weeks' Cases Compared to Routt County Population",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Percentage"),
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+
+```
+
+
+## Gender  
+
+```{r label=GenderCasesPieChart2weeks}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            filter(IsMostRecent2WeeksRolling=="Yes") %>%
+            group_by(gender) %>%
+            count(),
+          labels = ~gender, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          name = "Cases",
+          title = "Cases",
+          domain = list(row = 0, column = 0)) %>%
+  layout(margin = list(t=35,b=15),
+         title = list(text =  paste0("<b>Most recent two reporting weeks: </b><br>",format((as.Date(params$DataThroughDate)-13),'%B %d, %Y')," through ",
+                              format(as.Date(params$DataThroughDate),'%B %d, %Y')),
+                      font = list(family = "Arial", size = 14),
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 10),
+                      y = 1
+                      ),
+         height = "350",
+         width = "500")
+```
+```{r label=GenderCasesPieChartAll}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            filter(AttributionDate<=(params$DataThroughDate)) %>%
+            group_by(gender) %>%
+            count(),
+          labels = ~gender, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          name = "Cases",
+          title = "Cases",
+          domain = list(row = 0, column = 0)) %>%
+  add_pie(data = data.frame(Pop=c(12291,13393), gender=as.factor(c("Female","Male"))),
+          labels = ~gender, values = ~Pop,
+          marker = list(colors = c('#4E2B1F','#BB4628')),
+          sort = FALSE,
+          name = "Population",
+          title = "Population",
+          domain = list(row = 0, column = 1)) %>%
+  layout(margin = list(t=25,b=15),
+         title = list(text = "Gender Breakdown of COVID-19 Cases Compared to Routt County Population",
+                      font = list(family = "Arial", size = 14)),
+         grid=list(rows=1, columns=2))
+```
+
+
+## Geographic Distribution of Cases  
+Cases are attributed based upon address provided when tested and subsequently interviewed. Data may be skewed due to the use of PO Boxes.    
+ 
+```{r label=GeoCasesPerCapita}
+ConfProbCases %>%
+  mutate(ZIP = str_sub(zipcode, 1,5),
+         ZIPgroup = case_when(ZIP %in% c("80428", "80467", "80469", "80477", "80479", "80483", "80487", "80488", "81639") ~ "Routt",
+                              TRUE ~ as.character("Incomplete")),
+         City = case_when(ZIP %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          ZIP=="80428" ~ "North Routt",
+                          ZIP=="80467" ~ "South Routt",
+                          ZIP=="80469" ~ "South Routt",
+                          ZIP=="80479" ~ "South Routt",
+                          ZIP=="80483" ~ "South Routt",
+                          ZIP=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete"))) %>%
+  group_by(City) %>%
+  filter(AttributionDate<=(params$DataThroughDate)) %>%
+  summarise(NumberCases = n()) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate(TotalCases = ConfProbCases %>%
+           filter(!is.na(zipcode)) %>%
+           count() %>%
+           pull(),
+         TotalPop = 23509,
+         CasesPerCapita = round(NumberCases/Pop,4)*100000) %>%
+plot_ly(x = ~City, 
+        y = ~CasesPerCapita,
+        name = "Cases",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  layout(title = "Per Capita Cumulative Incidence",
+         xaxis = list(title = "City"),
+         yaxis = list(title = "Incidence Rate per 100,000"),
+         shapes = list(
+              list(type = 'line',
+                   xref = 'paper', x0=0, x1=1,
+                   yref = 'y', y0=(ConfProbCases %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
+                                     pull(CummInc)), y1=(ConfProbCases %>%
+                                                           count() %>%
+                                                           mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
+                                                           pull(CummInc)),
+                   line = list(color = '#4E2B1F'))),
+         annotations = list(
+           list(x = .5,
+                y = (ConfProbCases %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/params$RouttPop)*100000*1.03,2)) %>%
+                                     pull(CummInc)),
+                text = "Routt County Cumulative Incidence",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE)),
+         font = list(family = "Arial", size = 12))
+
+```
+
+```{r label=GeoCasesPerCapitaRecentMonth}
+ConfProbCases %>%
+  mutate(ZIP = str_sub(zipcode, 1,5),
+         ZIPgroup = case_when(ZIP %in% c("80428", "80467", "80469", "80477", "80479", "80483", "80487", "80488", "81639") ~ "Routt",
+                              TRUE ~ as.character("Incomplete")),
+         City = case_when(ZIP %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                          ZIP=="80428" ~ "North Routt",
+                          ZIP=="80467" ~ "South ROutt",
+                          ZIP=="80469" ~ "South Routt",
+                          ZIP=="80479" ~ "South Routt",
+                          ZIP=="80483" ~ "South Routt",
+                          ZIP=="81639" ~ "West Routt",
+                          TRUE ~ as.character("Incomplete"))) %>%
+  group_by(City) %>%
+  filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+  summarise(NumberCases = n()) %>%
+  left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                        Pop=c(706,3194,2463,17212)),
+             by = c("City")) %>%
+  mutate(TotalCases = ConfProbCases %>%
+           filter(!is.na(zipcode)) %>%
+           count() %>%
+           pull(),
+         TotalPop = 23509,
+         CasesPerCapita = round(NumberCases/Pop,4)*100000) %>%
+plot_ly(x = ~City, 
+        y = ~CasesPerCapita,
+        name = "Cases",
+        type = "bar",
+        marker = list(color = "#BB4628")) %>%
+  layout(title = "Per Capita Incidence Rate, Most Recent Complete Month",
+         xaxis = list(title = "City"),
+         yaxis = list(title = "Incidence Rate per 100,000"),
+         shapes = list(
+              list(type = 'line',
+                   xref = 'paper', x0=0, x1=1,
+                   yref = 'y', y0=(ConfProbCases %>%
+                                     filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                                     count() %>%
+                                     mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
+                                     pull(CummInc)), y1=(ConfProbCases %>%
+                                                           filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                                                           count() %>%
+                                                           mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
+                                                           pull(CummInc)),
+                   line = list(color = '#4E2B1F'))),
+         annotations = list(
+           list(x = .5,
+                y = (ConfProbCases %>%
+                       filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                       count() %>%
+                       mutate(CummInc=round((n/params$RouttPop)*100000*1.03,2)) %>%
+                       pull(CummInc)),
+                text = "Routt County Incidence",
+                xref = "paper",
+                yref = 'y',
+                showarrow = FALSE)),
+         font = list(family = "Arial", size = 12))
+
+```
+
+## Table of Cases  
+Click "Download" to download this table as a PDF, Excel or CSV file.  
+This table includes all confirmed cases and all probable cases.  
+```{r label=WebsiteSpreadsheetPrep, results='hide'}
+#include probables for which there is a positive antigen, but not other probables
+WebsiteCasesTablePrep <- expand_grid(#AgeGrouping = c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89","90+"), 
+                                     AttributionDate = Calendar$date)
+
+WebsiteCasesTable <- ConfProbCases %>%
+  select(eventid, casestatus, reporteddate, gender, AgeGrouping, ReportedDateWeek, ReportedWeekStart, CollectionDateWeek,
+         CollectionWeekStart, IsMostRecent2Weeks, AttributionDate) %>%
+  group_by(AttributionDate) %>%
+  summarise(NumberCases = n()) %>%
+  right_join(WebsiteCasesTablePrep, by = "AttributionDate") %>%
+  arrange(AttributionDate) %>%
+  replace(., is.na(.), 0) %>%
+  filter(AttributionDate<=(params$DataThroughDate)) 
+
+# # custom table container for website table
+# WebsiteTableSketch = htmltools::withTags(table(
+#   class = 'display',
+#   thead(
+#     tr(
+#       th(rowspan = 2, 'Date'),
+#       th(colspan = 11, 'Female'),
+#       th(colspan = 11, 'Male'),
+#       th(rowspan = 2, "Grand Total")
+#     ),
+#     tr(
+#       lapply(rep(c('0-9','10-19','20-29','30-39','40-49','50-59','60-69','70-79','80-89','90+','Total'), 2), th)
+#     )
+#   )
+# ))
+# print(WebsiteTableSketch)
+```
+``` {r label = createwebsitetable}
+WebsiteCasesTable %>%
+  rename("Date" = "AttributionDate") %>%
+  DT::datatable(
+    #container = WebsiteTableSketch,
+    rownames = FALSE,
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Bfrtip',
+      pageLength = 10,
+      scrollX = TRUE,
+      buttons = list(
+        'copy', 'print', list(
+          extend = 'collection',
+          buttons = c('csv', 'excel', 'pdf'),
+          text = 'Download')
+      ))
+  )
+```
+

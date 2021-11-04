@@ -1,3 +1,8 @@
+# OVERRIDE DEFAULTS - ignore HTML files that are the rendered markdown files
+*.html
+*.dcf
+/COVID-Data-Files
+
 # History files
 .Rhistory
 .Rapp.history

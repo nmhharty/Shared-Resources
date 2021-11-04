@@ -1,0 +1,84 @@
+---
+title: "Case Outcomes"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Case Outcomes  
+Case outcomes are reported according to the most severe outcome during the illness. For example, a hospitalized patient will be listed as hospitalized even after they have returned home. Outcome definitions are as follows:  
+  
+* Died = patient reported as died in CEDRS
+* Hospitalized = hospitalized during illness
+* Recovered = more than 28 days have passed since symptoms or test AND not hospitalized AND not died
+* Active = within 28 days of symptoms or test
+
+```{r label=CaseOutcomes}
+plot_ly() %>%
+  add_pie(data = ConfProbCases %>%
+            group_by(CaseOutcome) %>%
+            count(),
+          labels = ~CaseOutcome, values = ~n,
+          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691", "#F2BF4C"))) %>%
+  layout(margin = c(t=150),
+         title = list(text = "COVID-19 Case Outcomes",
+                      yref = "paper",
+                      y = 1.5,
+                      font = list(family = "Arial", size = 14)))
+```
+
+```{r label=CaseOutcomesAge}
+
+ConfProbCases %>%
+  filter(month(AttributionDate)<month(Sys.Date())) %>%
+  group_by(age_group, CaseOutcome) %>%
+  summarise(NumberCases = n()) %>%
+  pivot_wider(names_from = CaseOutcome, values_from = NumberCases) %>%
+  left_join((ConfProbCases %>%
+               filter(month(AttributionDate)<month(Sys.Date())) %>%
+               group_by(age_group) %>%
+               summarise(TotalCases = n())), by = "age_group") %>%
+  replace(., is.na(.), 0) %>%
+  mutate(RecoveredPct = round(Recovered/TotalCases*100,2),
+         HospitalPct = round(Hospitalized/TotalCases*100,2),
+         ActivePct = round(Active/TotalCases*100,2),
+         DiedPct = round(Died/TotalCases*100,2)) %>%
+plot_ly(x = ~age_group,
+        y = ~RecoveredPct,
+        type = "bar",
+        name = "Recovered",
+        color = I("#F2BF4C")) %>%
+add_trace(y = ~HospitalPct,
+          type = "bar",
+          name = "Hospitalized",
+          color = I("#477691")) %>%
+add_trace(y = ~DiedPct,
+          type = "bar",
+          name = "Died",
+          color = I("#BB4628")) %>%
+add_trace(y = ~ActivePct,
+          type = "bar",
+          name = "Active",
+          color = I("#4E2B1F")) %>%
+  layout(margin = list(t = 45),
+         title = list(text = "Case Outcomes by Age, All Cases through Most Recent Complete Month",
+                      yref = "container",
+                      yanchor = "top",
+                      pad = list(t = 15),
+                      y = 1),
+         xaxis = list(title = "Age Group"),
+         yaxis = list(title = "Proportion"),
+         barmode = "stack",
+         legend = list(orientation = 'h', y=-.25),
+         font = list(family = "Arial", size = 12))
+  
+```
+
+

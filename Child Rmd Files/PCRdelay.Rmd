@@ -1,0 +1,74 @@
+---
+title: "PCR Test Result Delay"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## PCR Test Result Delay  
+**Average Delay from Specimen Collection Date to Report Date, per Week** for most recent 6 weeks. Routt County Providers refers to all providers in the county who are sending their specimens to UCHealth/University Hospital, the CDPHE State Lab, or other private labs.      
+
+```{r label=TestResultDelayGraph}
+# PCRtests %>%
+#   filter(collectiondate>"2021-08-01") %>%
+#   group_by(TestingLab) %>%
+#   count() %>%
+# #  filter(n>200) %>%
+#   arrange(desc(n))
+
+PCRtests %>%
+  filter(Lab=="Routt County Providers") %>%
+  filter(!is.na(collectiondate)) %>%
+  mutate(ExcludeStateLab = case_when(TestingLab=="CDPHE - State Lab"&collectiondate>"2020-11-22"&collectiondate<"2021-03-01" ~ "Yes",
+                                     TestingLab=="Curative, Inc."&collectiondate<"2020-11-16" ~ "Yes",
+                                     TRUE ~ as.character("No"))) %>%
+  filter(ExcludeStateLab=="No") %>%
+  mutate(ReportDelay = resultdate-collectiondate) %>% 
+  group_by(CollectionWeekStart, Lab) %>%
+  summarise(AvgDelay = as.numeric(mean(ReportDelay, na.rm=TRUE))) %>%
+  pivot_wider(names_from = Lab, values_from = AvgDelay) %>%
+  rename("Routt County Providers Delay" = "Routt County Providers") %>%
+  left_join(PCRtests %>%
+              filter(Lab=="Routt County Providers") %>%
+              filter(!is.na(collectiondate)) %>%
+              mutate(Exclude = case_when(TestingLab=="CDPHE"&collectiondate>"2020-11-22"&collectiondate<"2021-03-01" ~ "Yes",
+                                         TestingLab=="CURATIVE"&collectiondate<"2020-11-16" ~ "Yes",
+                                         TRUE ~ as.character("No"))) %>%
+              filter(Exclude=="No") %>%
+              mutate(ReportDelay = receivedate-collectiondate) %>%  
+              group_by(CollectionWeekStart, Lab) %>%
+              summarise(NumTests = n()) %>%
+              pivot_wider(names_from = Lab, values_from = NumTests) %>%
+              rename("Routt County Providers Number of Tests" = "Routt County Providers"), by = "CollectionWeekStart") %>%
+  filter(CollectionWeekStart>(as.Date(params$MostRecentWeekStart)-42)) %>%
+  filter(CollectionWeekStart<=params$MostRecentWeekStart) %>%
+  mutate(textCountyProviders=paste0("Number of Tests: ",`Routt County Providers Number of Tests`,
+                                    "<br>Avg Delay: ",round(`Routt County Providers Delay`,2)," days")) %>%
+plot_ly(x = ~CollectionWeekStart, y = ~AvgDelay) %>%
+  add_trace(y = ~`Routt County Providers Delay`,
+            name = "Routt County Providers",
+            type = "bar",
+            marker = list(color = "#BB4628"),
+            text = ~textCountyProviders,
+            hoverinfo = "text") %>%
+  layout(xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tick0 = "2000-01-10",
+                      dtick = 604800000,
+                      title = "Week Start (all dates are Mondays)"),
+         yaxis = list(title = "Average Delay (days)",
+                      nticks = 6),
+         font = list(family = "Arial", size = 12))
+
+
+```
+
+
