@@ -1,6 +1,6 @@
 #Script to load and clean vaccination data for dashboard
 #First authored 2/2/2021 by Nicole Harty
-#Last update: 11/3/2021
+#Last update: 11/16/2021
 
 
 # Creating Population Level Vax Dataframes --------------------------------
@@ -44,33 +44,63 @@ PtIZ %>%
 #   arrange(desc(NumPeople))
 
 
-PtIZ <- PtIZ %>% 
-  mutate(FullyVax = case_when(vaccination_code=="COVID-19 Vector-NR (JSN)" ~ "Yes",
-                              vaccination_code!="COVID-19 Vector-NR (JSN)"&dosage_num==2 ~ "Yes",
-                              TRUE ~ as.character("No"))) 
-
 
 # Vaccine Efficacy --------------------------------------------------------
 
-#identify VACCINE BREAKTHROUGH
-VaxBreakthroughList <- ConfProbCases %>%
-  select(eventid, first_name, last_name, date_of_birth, AttributionDate) %>%
-  inner_join((PtIZ %>%
-                select(patient_id, patient_first_name, patient_last_name, patient_dob, vaccination_date, vaccination_code, FullyVax) %>%
-                filter(FullyVax=="Yes")),
-             by = c("first_name" = "patient_first_name", "last_name" = "patient_last_name", "date_of_birth" = "patient_dob")) %>%
-  filter(AttributionDate>vaccination_date) %>%
-  mutate(DaysVaxMinusTest = as.numeric(difftime(AttributionDate,vaccination_date, units = "days")),
-         AttributionDateMonthStart = as.Date(paste0(year(AttributionDate),"-",month(AttributionDate),"-01"))
-         ) %>%
-  filter(DaysVaxMinusTest>=14)
+#Need to update Fully Vax to label subsequent doses (>2 as fully vax)
 
-#Add vaccination info to cases
-DoseInfoVaxBreakthrough <- VaxBreakthroughList %>%
-  select(-vaccination_date, -vaccination_code) %>%
-  left_join((PtIZ %>%
-               select(patient_first_name, patient_last_name, patient_dob, vaccination_date, dosage_num, vaccination_code, clinic_desc)), 
-            by = c("first_name" = "patient_first_name", "last_name" = "patient_last_name", "date_of_birth" = "patient_dob"))
+PtIZ <- PtIZ %>% 
+  mutate(FullyVax = case_when(vaccination_code=="COVID-19 Vector-NR (JSN)" ~ "Yes",
+                              vaccination_code!="COVID-19 Vector-NR (JSN)"&dosage_num==2 ~ "Yes",
+                              TRUE ~ as.character("No")),
+         zip = str_sub(zip_code,1,5)) %>%
+  mutate(City = case_when(zip %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
+                                   zip=="80428" ~ "North Routt",
+                                   zip=="80467" ~ "South Routt",
+                                   zip=="80469" ~ "South Routt",
+                                   zip=="80479" ~ "South Routt",
+                                   zip=="80483" ~ "South Routt",
+                                   zip=="81639" ~ "West Routt",
+                                   TRUE ~ as.character("Incomplete or Missing")),
+         DoseDateWeek = isoweek(vaccination_date), 
+         DoseDateWeekStart = floor_date(vaccination_date, "week", week_start = getOption("lubridate.week.start", 1)))
+FullyVax <- PtIZ %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id, vaccination_date) %>%
+  distinct() %>%
+  mutate(FullyVaxDate = vaccination_date+14,
+         # FullyVaxDateMonth = month(FullyVaxDate),
+         FullyVaxDateAttr = case_when(month(FullyVaxDate)==12 ~ as.Date(paste0((year(FullyVaxDate)+1),"-01","-01")),
+                                      month(FullyVaxDate)<12 ~ as.Date(paste0(year(FullyVaxDate),"-",(month(FullyVaxDate)+1),"-01"))
+         ),
+         FullyVaxWeekStart = floor_date(FullyVaxDate, "week", week_start = getOption("lubridate.week.start", 1)),
+         FullyVaxWeekAttr = FullyVaxWeekStart+7)
+
+
+#identify VACCINE BREAKTHROUGH
+## NOV 17: 
+## no longer using this because CEDRS report from LPHA portal has breakthrough column I was recreating 
+##  LPHA portal file uses ALL CIIS not just Routt resident records to determine breakthrough. 
+##  # CDPHE PORTAL FILE identifies 564 breakthrough as of 11/16. Routt identified through code = 506
+##  
+# VaxBreakthroughList <- ConfProbCases %>%
+#   select(eventid, first_name, last_name, date_of_birth, AttributionDate) %>%
+#   inner_join((PtIZ %>%
+#                 select(patient_id, patient_first_name, patient_last_name, patient_dob, vaccination_date, vaccination_code, FullyVax) %>%
+#                 filter(FullyVax=="Yes")),
+#              by = c("first_name" = "patient_first_name", "last_name" = "patient_last_name", "date_of_birth" = "patient_dob")) %>%
+#   filter(AttributionDate>vaccination_date) %>%
+#   mutate(DaysVaxMinusTest = as.numeric(difftime(AttributionDate,vaccination_date, units = "days")),
+#          AttributionDateMonthStart = as.Date(paste0(year(AttributionDate),"-",month(AttributionDate),"-01"))
+#          ) %>%
+#   filter(DaysVaxMinusTest>=14)
+# 
+# #Add vaccination info to cases
+# DoseInfoVaxBreakthrough <- VaxBreakthroughList %>%
+#   select(-vaccination_date, -vaccination_code) %>%
+#   left_join((PtIZ %>%
+#                select(patient_first_name, patient_last_name, patient_dob, vaccination_date, dosage_num, vaccination_code, clinic_desc)), 
+#             by = c("first_name" = "patient_first_name", "last_name" = "patient_last_name", "date_of_birth" = "patient_dob"))
 
 
 #publish to Google Sheets
@@ -85,7 +115,6 @@ DoseInfoVaxBreakthrough <- VaxBreakthroughList %>%
 #             sheet = "Dose Info")
 
 #PCV PPV Graph
-library(plotly)
 
 # TwoWeekDates <- Calendar %>%
 #   # select(WeekStart) %>%
@@ -107,19 +136,15 @@ library(plotly)
 #          FullyVaxWeekAttr = FullyVaxWeekStart+7)
 # FullyVax$FullyVaxMonthAttr <- month(FullyVax$FullyVaxMonthAttr, label = TRUE)
 
-FullyVax <- PtIZ %>%
-  filter(FullyVax=="Yes") %>%
-  select(patient_id, vaccination_date) %>%
-  distinct() %>%
-  mutate(FullyVaxDate = vaccination_date+14,
-         # FullyVaxDateMonth = month(FullyVaxDate),
-         FullyVaxDateAttr = case_when(month(FullyVaxDate)==12 ~ as.Date(paste0((year(FullyVaxDate)+1),"-01","-01")),
-                                       month(FullyVaxDate)<12 ~ as.Date(paste0(year(FullyVaxDate),"-",(month(FullyVaxDate)+1),"-01"))
-                                      ),
-         FullyVaxWeekStart = floor_date(FullyVaxDate, "week", week_start = getOption("lubridate.week.start", 1)),
-         FullyVaxWeekAttr = FullyVaxWeekStart+7)
-         
+
 # FullyVax$FullyVaxMonthAttr <- month(FullyVax$FullyVaxMonthAttr, label = TRUE)
+
+
+# Boosters and Third Doses ------------------------------------------------
+
+
+
+# Queries - not run -------------------------------------------------------
 
 
 # 

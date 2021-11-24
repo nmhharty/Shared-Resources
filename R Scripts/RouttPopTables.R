@@ -9,6 +9,8 @@
 #Routt Pop by Geography, 2019 data
 RouttPopGeog <- data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
                            Pop=c(706,3194,2463,17212))
+RouttPopGeog2020 <- data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
+                           Pop=c(821,3323,2610,18075))
 
 RouttPopTable <- read.csv("../Shared-Resources/COVID-Data-Files/county_sya_data.csv", sep = "\t")
 RouttPopTable <- RouttPopTable %>%
@@ -61,3 +63,5 @@ RouttPopTable2 <- RouttPopTable2 %>%
                            AgeGroup5yr=="90-94" ~ "90-99",
                            AgeGroup5yr=="95-99" ~ "90-99",
                            AgeGroup5yr=="100+" ~ "100+"))
+
+RouttPopTable2[,c(6,7)] <- lapply(RouttPopTable2[,c(6,7)], as.factor)

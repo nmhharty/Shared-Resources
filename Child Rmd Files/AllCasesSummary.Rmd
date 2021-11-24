@@ -210,7 +210,7 @@ ConfProbCases %>%
                               TRUE ~ as.character("Incomplete")),
          City = case_when(ZIP %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
                           ZIP=="80428" ~ "North Routt",
-                          ZIP=="80467" ~ "South ROutt",
+                          ZIP=="80467" ~ "South Routt",
                           ZIP=="80469" ~ "South Routt",
                           ZIP=="80479" ~ "South Routt",
                           ZIP=="80483" ~ "South Routt",

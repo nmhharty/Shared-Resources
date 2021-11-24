@@ -151,6 +151,16 @@ AllCases <- AllCases %>%
 ConfProbCases <- AllCases %>%
   filter(casestatus %in% c("confirmed", "probable"))
 
+#need to add vax_utd14 -- adds 14 days to final dose (vax_utd + 14) for when counted as breakthrough
+##^^this is necessary for any person-time analysis or more detailed breakthrough calculations/analysis. it's used in determining if breakthrough
+ConfProbCases <- ConfProbCases %>%
+  mutate(FullyVaxAtCaseReport = case_when(!is.na(vaccine_received)&partialonly==FALSE ~ TRUE,   #Add a column for FullyVax
+                                          !is.na(vaccine_received)&partialonly==TRUE ~ FALSE,
+                                          TRUE ~ NA),
+         DaysVaxMinusTest = as.numeric(difftime(AttributionDate, vax_utd, units = "days")),
+         AttributionDateMonthStart = as.Date(paste0(year(AttributionDate),"-",month(AttributionDate),"-01")),  #Need MONTH for vax breakthrough graphs
+         vax_utd14 = vax_utd+days(14))
+
 
 # #Checking for missing labs
 # ConfProbCases %>%

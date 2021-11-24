@@ -1,6 +1,6 @@
 #Script to load Dr J data and School Case Report data for schools analysis
 #First authored 9/3/2021 by Nicole Harty
-#Last update: 10/18/2021
+#Last update: 11/9/2021
 
 
 # Pull from JUSTINA SQL database ------------------------------------------
@@ -30,6 +30,11 @@ DrJ <- dbGetQuery(con, "SELECT DateOpened, EventID, FirstName, LastName, FinalDi
                     		      ) b
                     		WHERE TestRank = 1")
 DrJ$EventID <- as.numeric((DrJ$EventID))
+
+# School COVID Case Report Import ----------------------------
+SchoolCaseReportForm2 <- range_read("https://docs.google.com/spreadsheets/d/1IS5XZL6i4xsnJEegykJYlik6BARRfetXbrQvpMYRd4g/edit?resourcekey#gid=164583539",
+                                    sheet = 1) %>%
+  filter(Timestamp>"2021-10-10")
 
 # Join Dr J and CEDRS -----------------------------------------------------
 
@@ -297,13 +302,42 @@ DrJSchoolAge <- DrJSchoolAge %>%
 DrJSchoolAge <- DrJSchoolAge %>%
   mutate(LastUpdate = Sys.time())
 # gs4_create(name = "SchoolAge Case Review", sheets = DrJSchoolAge) #this creates the sheet the first time
-sheet_write(DrJSchoolAge, ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213", 
-            sheet = "DrJSchoolAge")  #this updates the existing sheet
+# sheet_write(DrJSchoolAge, ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213", 
+#             sheet = "DrJSchoolAge")  #this updates the existing sheet
 
-# School COVID Case Report Form Data Wrangling ----------------------------
-SchoolCaseReportForm <- range_read("https://docs.google.com/spreadsheets/d/1IS5XZL6i4xsnJEegykJYlik6BARRfetXbrQvpMYRd4g/edit?resourcekey#gid=164583539",
-                                   sheet = 2)
 
+
+# Ongoing Data QA Between Dr J and Case Report Form -----------------------
+
+#Cases in DR J but NOT in Case Report Form
+# colnames(DrJSchoolAge)
+DrJ_NOT_CaseReportForm <- DrJSchoolAge %>%
+  select(1:4,7,8,16,11,12,28) %>%
+  mutate(Name = str_to_lower(paste0(FirstName, " ", LastName))) %>%
+  filter(DateOpened>"2021-10-10") %>%
+  anti_join(SchoolCaseReportForm2 %>%
+              mutate(NameLower = str_to_lower(`First and Last Name of COVID + Individual`)) %>%
+              select(1,4,5,18), by = c("Name" = "NameLower"))
+
+#Cases in Case Report Form but NOT in Dr J
+CaseReportForm_NOT_DrJ <- SchoolCaseReportForm2 %>%
+  mutate(NameLower = str_to_lower(`First and Last Name of COVID + Individual`)) %>%
+  select(1,4,5,18) %>%
+  anti_join(DrJSchoolAge %>%
+              select(1:4,7,8,11,12,16,28) %>%
+              mutate(Name = str_to_lower(paste0(FirstName, " ", LastName))), by = c("NameLower" = "Name"))
+
+# sheet_write(DrJ_NOT_CaseReportForm %>%
+#               mutate(ReviewComplete = ""), ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
+#             sheet = "QA Dr J Cases Not in Form")  #this creates new tab for ongoing QA of cases, overrides list each time
+
+#UNCOMMENT THIS TO UPDATE
+# 
+# range_write(ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
+#             DrJ_NOT_CaseReportForm %>%
+#               filter(DateOpened>"2021-11-10"),
+#             sheet = "QA Dr J Cases Not in Form",
+#             range = "A:K")
 
 # Region Summaries and Region Pop --------------------------------------------------------------
 

@@ -20,7 +20,7 @@ attr(PHtracking$ReportedDate, "tzone") <- "America/Denver"
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-09-20") %>%
+  filter(ReportedWeekStart>="2021-10-03") %>%
   group_by(ReportedWeekStart, `Day of Week`, AMorPM) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -29,25 +29,40 @@ plot_ly(x = ~`Day of Week`,
         color = ~AMorPM,
       #  boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Sept 20",
+layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Oct 3",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-09-20") %>%
+  filter(ReportedWeekStart>="2021-10-03") %>%
   group_by(ReportedWeekStart, `Day of Week`) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
         y = ~n,
         type = 'box',
-      #  boxpoints = "all",
+       # boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week Since Sept 20",
+layout(title = "Number of Cases Reported Each Day, by Day of Week Since Oct 3",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
+
+```
+
+
+```{r label=CICTmetricsPrep}
+
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};Server=s-vm10-ph01;database=JUSTINA", timeout = 10)
+#DrJ dataframe for joining to CEDRS
+CICTmetrics <- dbGetQuery(con, "SELECT CAST(date_opened as datetime2) as DateOpened, CAST(event_id as int) as EventID, 
+                                          CAST(first_name as varchar(256)) as FirstName, CAST(last_name as varchar(256)) as LastName, 
+                                          CAST(final_disposition as varchar(256)) as FinalDisposition, 
+                                          CAST(initial_interview_date as datetime2) as InitialInterview, 
+                                          CAST(interview_complete_date as datetime2), assigned_to_primary_name
+                                    FROM JUSTINA.dbo.patient
+                                    WHERE final_disposition in ('reached_not_complete','reached_completed','unreachable','', NULL)")
 
 ```
 

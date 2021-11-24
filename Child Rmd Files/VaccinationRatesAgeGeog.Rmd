@@ -17,10 +17,10 @@ output:
 |-----|------|-----|
 |Routt Residents (All Ages) Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1) %>% count() %>% pull())/params$RouttPop)`|
 |Routt Residents (All Ages) Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/params$RouttPop)`|
-|Routt Residents 16+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
-|Routt Residents 16+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>15) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>15) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
 |Routt Residents 12+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
 |Routt Residents 12+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
+|Routt Residents Ages 5-11 Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>4, age_at_1stvaccination<12) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>4, age_at_1stvaccination<12) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>4,AGE<12) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents Ages 5-11 Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>4, age_at_1stvaccination<12) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>4, age_at_1stvaccination<12) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>4,AGE<12) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
 
 
 This table provides percentages both using the entire Routt County population as the denominator (first two rows) and the population aged 16 and older as the denominator (last two rows). As of May 12, 2021, individuals 12 to 15 years are eligible to receive a COVID-19 vaccine. Routt's Road to Recovery set a goal of 75% of county residents 16 and older completing the vaccination series, so this table includes both a percentage of all residents as well as a percentage of residents 16 and older.   
@@ -103,3 +103,20 @@ PtIZ %>%
 **South Routt** includes ZIP codes 80467, 80469, 80479, 80483  
 **West Routt** includes ZIP code 81639  
 **Steamboat Springs** includes ZIP codes 80477, 80487, 80488  
+
+```{r label=GeogRatesCHILDHOOD, eval = params$Internal}
+PtIZ %>%
+  filter(age_at_1stvaccination<12) %>%
+  group_by(City) %>%
+  count() %>%
+  left_join(RouttPopGeog,
+             by = c("City")) %>%
+  mutate(ProportionVax = scales::percent(n/(PtIZ %>%
+                              filter(age_at_1stvaccination<12) %>%
+                              count()) %>%
+                              pull(n)),
+         PropPop = scales::percent(Pop/RouttPopGeog %>%
+                                        summarise(POPtotal=sum(Pop)) %>%
+                                     pull(POPtotal))) %>%
+  kable(caption = "Childhood Vaccines by Region")
+```

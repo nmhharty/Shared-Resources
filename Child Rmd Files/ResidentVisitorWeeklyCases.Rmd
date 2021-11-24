@@ -71,9 +71,10 @@ plot_ly(
                       tickformat = "%b %d, %Y",
                       autotick = F, 
                       tick0 = "2000-01-10",
-                      dtick = 604800000,
+                      dtick = 1209600000,
                       tickangle = 45,
                       title = "Week Start (all dates are Mondays)"),
+          legend = list(orientation = 'h', y=-.3),
          yaxis = list(title = "Number of Cases"),
          barmode = "stack",
          font = list(family = "Arial", size = 12)) 
