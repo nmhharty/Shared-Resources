@@ -1,0 +1,34 @@
+---
+title: "Steamboat Springs School District Details"
+author: "Nicole Harty"
+date: "r format(Sys.time(), '%B %d, %Y')"
+output: html_document
+---
+
+## School-Specific Vaccination Rates  
+
+Schools with at least 80% of their vaccine-eligible population vaccinated are exempt from needing to quarantine students with routine classroom exposures to COVID-19. The table below summarizes vaccination rates for schools in Steamboat Springs School District.  
+
+Data compiled by Routt County Public Health with assistance from Steamboat Springs School District.  				
+Limitations:  
+
+1. Vaccination rates are based upon data in the Colorado Immunization Informatino System (CIIS) which may be missing some vaccinations.  
+2. Inidividual-level matching is based upon name and date of birth match between school records and CIIS.				
+
+**Last updated: 9/17/2021**
+
+```{r label=SSSDvaxRates}
+SSSDvaxRate <- read.xlsx("../SSSD Vax Info/SSSD_SchoolVaxRate.xlsx", startRow = 4, sep.names = " ")
+SSSDvaxRate <- SSSDvaxRate %>%
+  head(nrow(SSSDvaxRate) - 1)
+SSSDvaxRate[,c(5:7,9:11)] <- lapply(SSSDvaxRate[,c(5:7,9:11)], scales::percent)
+SSSDvaxRate[,c(12:14)] <- lapply(SSSDvaxRate[,c(12:14)], round, digits = 0)
+
+
+SSSDvaxRate %>% 
+  select(1:2,4,10,13) %>%
+  rename("Estimated Vaccination Rate, Eligible Population" = 4,
+         "Estimated Number of Additional Vaccinated People Needed to Meet 80% Goal" = 5) %>%
+  kable(caption="Steamboat Springs School District Vaccination Rate Estimates")
+
+```

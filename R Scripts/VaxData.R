@@ -142,7 +142,7 @@ FullyVax <- PtIZ %>%
 
 # Boosters and Third Doses ------------------------------------------------
 
-
+#all in RMD file
 
 # Queries - not run -------------------------------------------------------
 
@@ -228,3 +228,4 @@ FullyVax <- PtIZ %>%
 #   (RouttPopTable2 %>%
 #      filter(AGE<18, AGE>11) %>%
 #      summarise(TotalPop = sum(TOTAL)))
+#      

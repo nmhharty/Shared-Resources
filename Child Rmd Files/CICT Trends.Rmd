@@ -20,7 +20,7 @@ attr(PHtracking$ReportedDate, "tzone") <- "America/Denver"
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-10-03") %>%
+  filter(ReportedWeekStart>="2021-11-08") %>%
   group_by(ReportedWeekStart, `Day of Week`, AMorPM) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -29,14 +29,14 @@ plot_ly(x = ~`Day of Week`,
         color = ~AMorPM,
       #  boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Oct 3",
+layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Nov 8",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-10-03") %>%
+  filter(ReportedWeekStart>="2021-11-08") %>%
   group_by(ReportedWeekStart, `Day of Week`) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -44,30 +44,166 @@ plot_ly(x = ~`Day of Week`,
         type = 'box',
        # boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week Since Oct 3",
+layout(title = "Number of Cases Reported Each Day, by Day of Week Since Nov 8",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
 
 ```
 
-
 ```{r label=CICTmetricsPrep}
 
 con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};Server=s-vm10-ph01;database=JUSTINA", timeout = 10)
 #DrJ dataframe for joining to CEDRS
 CICTmetrics <- dbGetQuery(con, "SELECT CAST(date_opened as datetime2) as DateOpened, CAST(event_id as int) as EventID, 
-                                          CAST(first_name as varchar(256)) as FirstName, CAST(last_name as varchar(256)) as LastName, 
                                           CAST(final_disposition as varchar(256)) as FinalDisposition, 
+                                          CAST(assigned_last_date_primary as datetime2) as InitialAssignment,
                                           CAST(initial_interview_date as datetime2) as InitialInterview, 
-                                          CAST(interview_complete_date as datetime2), assigned_to_primary_name
+                                          CAST(interview_complete_date as datetime2) as InterviewComplete, 
+                                          CAST(assigned_to_primary_name as varchar(256)) as CICTassigned
                                     FROM JUSTINA.dbo.patient
-                                    WHERE final_disposition in ('reached_not_complete','reached_completed','unreachable','', NULL)")
+                                    WHERE final_disposition in ('reached_not_complete','reached_completed','unreachable','', NULL)
+                                          and date_opened > '2021-05-01'")
+
+CICTmetrics[,c(1,4:6)] <- lapply(CICTmetrics[,c(1,4:6)], as.POSIXct, format = "%Y-%m-%d %H:%M:%OS")
+CICTmetrics[CICTmetrics == "1900-01-01"] <- NA
+
+CICTmetrics <- CICTmetrics %>%
+  mutate(InitialInterviewUTC = InitialInterview+hours(6),
+         FirstContactDelay = difftime(InitialInterviewUTC,InitialAssignment, units = "days"),
+         InterviewCompleteDelay = difftime(InterviewComplete,InitialAssignment, units = "days")) %>%
+  filter(FirstContactDelay>-2,
+         InterviewCompleteDelay>-2) %>%
+  mutate(FirstContactDelayDays = case_when(FirstContactDelay<1 ~ "Under 24 hours",
+                                                FirstContactDelay<3 ~ "1 to 3 Days",
+                                                TRUE ~ as.character("More than 3 Days")),
+         InterviewCompleteDelayDays = case_when(InterviewCompleteDelay<1 ~ "Under 24 hours",
+                                                InterviewCompleteDelay<3 ~ "1 to 3 Days",
+                                                TRUE ~ as.character("More than 3 Days")))
+
+CICTmetricsSummary <- CICTmetrics %>%
+  filter(DateOpened>"2021-08-01", FinalDisposition!="") %>%
+  group_by(CICTassigned, FinalDisposition) %>%
+  summarise(AvgFirstContact = mean(FirstContactDelay, na.rm = TRUE),
+            AvgInterviewComplete = mean(InterviewCompleteDelay, na.rm = TRUE)) %>%
+  mutate(AvgFirstContact = case_when(AvgFirstContact<1 ~ "Under 24 hours",
+                                                AvgFirstContact<3 ~ "1 to 3 Days",
+                                                TRUE ~ as.character("More than 3 Days")),
+         AvgInterviewComplete = case_when(AvgInterviewComplete<1 ~ "Under 24 hours",
+                                                AvgInterviewComplete<3 ~ "1 to 3 Days",
+                                                TRUE ~ as.character("More than 3 Days"))) %>%
+  arrange(CICTassigned, FinalDisposition) 
+CICTmetricsSummary[,c(3:4)] <- lapply(CICTmetricsSummary[,c(3:4)], factor, levels = c("Under 24 hours", "1 to 3 Days", "More than 3 Days"))
+
+```
+
+```{r label=TimeToContactAttempt}
+
+CICTmetricsSummary %>%
+  filter(str_detect(CICTassigned,"Routt")) %>%
+plot_ly(x = ~CICTassigned,
+        y = ~AvgFirstContact,
+        color = ~FinalDisposition,
+        colors = c('#4E2B1F', '#BB4628', "#477691"),
+        type= "scatter",
+        legendgroup = ~FinalDisposition
+        ) %>%
+  layout(title ="Mean time to First Contact by Investigator and Final Disposition since May 2021",
+         margin = list(l=50,r=50,h=175),
+         legend = list(orientation = 'h', y=-.45),
+         xaxis = list(
+           title = "Investigator",
+           font = list (family = "Arial",size = 14),
+           tickangle = -45,
+           type = 'category'
+           ),
+         yaxis = list (
+           title = "Duration",
+           font = list (family = "Arial",size = 14)
+            )
+         )
 
 ```
 
 ```{r label=TimeToInterviewComplete}
+
+CICTmetricsSummary %>%
+  filter(str_detect(CICTassigned,"Routt")) %>%
+plot_ly(x = ~CICTassigned,
+        y = ~AvgInterviewComplete,
+        color = ~FinalDisposition,
+        colors = c('#4E2B1F', '#BB4628', "#477691"),
+        type= "scatter",
+        legendgroup = ~FinalDisposition
+        ) %>%
+  layout(title ="Mean time to Interview Complete by Investigator since May 2021",
+         margin = list(l=50,r=50,h=175),
+         legend = list(orientation = 'h', y=-.45),
+         xaxis = list(
+           title = "Investigator",
+           font = list (family = "Arial",size = 14),
+           tickangle = -45,
+           type = 'category'
+           ),
+         yaxis = list (
+           title = "Duration",
+           font = list (family = "Arial",size = 14)
+            )
+  )
+
 ```
 
-```{r label=TimeToInterviewAttempt}
+```{r label=LTFUanalysis}
+
+# look at # LTFU overtime -- use Google Sheet data
+PHtracking %>%
+  group_by(AttributionWeekStart) %>%
+  summarise(TotalCases = n()) %>%
+  left_join(PHtracking %>%
+              mutate(LTFU = case_when(str_detect(Notes,"LTFU") ~ TRUE,
+                          is.na(Notes) ~ FALSE,
+                          TRUE ~ FALSE)) %>%
+              filter(LTFU==TRUE) %>%
+              group_by(AttributionWeekStart) %>%
+              count(), by = "AttributionWeekStart") %>%
+  mutate(LTFUpercent = round((n/TotalCases)*100,2)) %>%
+  filter(!is.na(AttributionWeekStart), AttributionWeekStart>="2021-07-5") %>%
+  replace(., is.na(.), 0) %>%
+  arrange(AttributionWeekStart) %>%
+plot_ly(x = ~AttributionWeekStart,
+        y = ~LTFUpercent,
+        type = "bar",
+        yaxis = "y",
+        name = "Percentage Lost to Follow-up (LTFU)"
+        ) %>%
+add_trace(y = ~TotalCases,
+          type = "scatter",
+          mode = "line",
+          name = 'Total Weekly Case Count',
+          yaxis = "y2") %>%
+  layout(title ="Percentage of Weekly Cases LTFU and Total Weekly Cases Since July 5, 2021",
+         margin = list(l=50,r=50,h=175),
+         legend = list(orientation = 'h', y=-.45),
+         xaxis = list(
+           title = "Week Start",
+           font = list (family = "Arial",size = 14),
+           tickangle = -45,
+           type = 'category'
+           ),
+         yaxis = list (
+           title = "Percentage",
+           font = list (family = "Arial",size = 14)
+            ),
+         yaxis2 = list(
+           tickfont = list(color = "#4E2B1F"),
+           dtick = 25,
+           overlaying = "y",
+           side = "right",
+           title = "Weekly Number of Cases",
+           rangemode = "tozero",
+           showgrid = F)
+  )
+
+
+
 ```

@@ -43,7 +43,7 @@ DRJcedrs <- DrJ %>%
   left_join(ConfProbCases %>%
               select(eventid, profileid, casestatus, gender, date_of_birth, city, zipcode, hospitalized, onsetdate, earliest_collectiondate, 
                      AttributionDate, reporteddate, AttributionWeekStart), by = c("EventID" = "eventid")) %>%
-  filter(FinalDisposition %in% c("reached_completed", "reached_not_completed", "unreachable", ""))
+  filter(FinalDisposition %in% c("reached_completed", "reached_not_completed", "unreachable", "", "investigation_not_attempted"))
 
 #Add to DrJ data frame employer/school name from CEDRS for those where it matches (this is to include the CDE data)
 ## 10/18/2021 MUST USE NOVELCORONAVIRUS REPORT FOR THIS SO NEED TO REVISIT
@@ -302,7 +302,7 @@ DrJSchoolAge <- DrJSchoolAge %>%
 DrJSchoolAge <- DrJSchoolAge %>%
   mutate(LastUpdate = Sys.time())
 # gs4_create(name = "SchoolAge Case Review", sheets = DrJSchoolAge) #this creates the sheet the first time
-# sheet_write(DrJSchoolAge, ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213", 
+# sheet_write(DrJSchoolAge, ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
 #             sheet = "DrJSchoolAge")  #this updates the existing sheet
 
 
@@ -326,7 +326,7 @@ CaseReportForm_NOT_DrJ <- SchoolCaseReportForm2 %>%
   anti_join(DrJSchoolAge %>%
               select(1:4,7,8,11,12,16,28) %>%
               mutate(Name = str_to_lower(paste0(FirstName, " ", LastName))), by = c("NameLower" = "Name"))
-
+# 
 # sheet_write(DrJ_NOT_CaseReportForm %>%
 #               mutate(ReviewComplete = ""), ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
 #             sheet = "QA Dr J Cases Not in Form")  #this creates new tab for ongoing QA of cases, overrides list each time
@@ -335,7 +335,7 @@ CaseReportForm_NOT_DrJ <- SchoolCaseReportForm2 %>%
 # 
 # range_write(ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
 #             DrJ_NOT_CaseReportForm %>%
-#               filter(DateOpened>"2021-11-10"),
+#               filter(DateOpened>"2021-11-29"),
 #             sheet = "QA Dr J Cases Not in Form",
 #             range = "A:K")
 

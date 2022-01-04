@@ -21,7 +21,7 @@ SchoolOutbreaks <- Outbreaks %>%
                                      `Start Date` < "2022-08-01" ~ "Summer 2022 to date",
                                      `Start Date` < "2023-06-01" ~ "2022-23 to date",
                                      TRUE ~ as.character("Not during academic year.")),
-         "School or District" = case_when(str_detect(`Outbreak Name`,"SSHS")|str_detect(`Outbreak Name`,"SSMS")|
+         "School or District" = case_when(str_detect(`Outbreak Name`,"SSHS")|str_detect(`Outbreak Name`,"SSMS")|str_detect(`Outbreak Name`,"Steamboat Springs Middle")|
                                             str_detect(`Outbreak Name`,"Strawberry Park")|str_detect(`Outbreak Name`,"Soda Creek")|
                                             str_detect(`Outbreak Name`,"Sleeping Giant") ~ "Steamboat Springs School District",
                                           str_detect(`Outbreak Name`,"SOROCO")|str_detect(`Outbreak Name`,"Yampa")|

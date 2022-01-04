@@ -40,11 +40,11 @@ plot_ly() %>%
     font = list(size = 12)),
   gauge = list(
     shape = "bullet",
-    axis = list(range = c(0, 500)),
+    axis = list(range = c(0, 600)),
     steps = list(
       list(range = c(0, 52), color = "rgb(71, 118, 145)"),
       list(range = c(52, 256), color = "rgb(187, 70, 40)"),
-      list(range = c(256, 500), color = "rgb(78, 43, 31)")
+      list(range = c(256, 600), color = "rgb(78, 43, 31)")
       ),
     # height = 150,
     bgcolor = "white",
@@ -87,11 +87,11 @@ plot_ly() %>%
     font = list(size = 12)),
   gauge = list(
     shape = "bullet",
-    axis = list(range = c(0, 15)),
+    axis = list(range = c(0, 25)),
     steps = list(
       list(range = c(0, 5), color = "rgb(71, 118, 145)"),
       list(range = c(5, 10), color = "rgb(187, 70, 40)"),
-      list(range = c(10, 15), color = "rgb(78, 43, 31)")
+      list(range = c(10, 25), color = "rgb(78, 43, 31)")
       ),
     # height = 150,
     bgcolor = "white",

@@ -12,7 +12,7 @@ library(openxlsx)
 
 # TestsRawCSV <- read.csv("COVID-Data-Files/CEDRS_COVIDELRTests.csv", skip = 3)
 # CasesRawXLSX <- read.xlsx("../Shared-Resources/COVID-Data-Files/CEDRS_NovelCoronavirusListing.xlsx", startRow = 4)
-
+variantData <- TestsRaw <- read.delim("../Shared-Resources/COVID-Data-Files/elr_variant_tests_Routt.txt", sep = "|")
 TestsRaw <- read.delim("../Shared-Resources/COVID-Data-Files/elr_tests_Routt.txt", sep = "|")
 CasesRaw <- read.delim("../Shared-Resources/COVID-Data-Files/cedrs_Routt.txt", sep = "|")
 
@@ -95,6 +95,7 @@ PCRtests<- PCRtests %>%
 
 NonAntibodyTests <- AllTests %>%
   filter(test_type!="serology")
+
 
 #dedup people who get antigen and PCR the same day
 
@@ -180,11 +181,14 @@ ConfProbCases <- ConfProbCases %>%
 
 #10/18/2021 updated to use onsetdate_proxy for determining recovered
 
-ConfProbCases <- ConfProbCases %>%
-  mutate(CaseOutcome = case_when(outcome=="Patient died" ~ "Died",
-                                 hospitalized=="TRUE" ~ "Hospitalized",
-                                 difftime(params$DataThroughDate,onsetdate_proxy_dist)>28 ~ "Recovered",
-                                 TRUE ~ as.character("Active"))) 
+# ConfProbCases <- ConfProbCases %>%
+#   mutate(CaseOutcome = case_when(outcome=="Patient died" ~ "Died",
+#                                  hospitalized=="TRUE" ~ "Hospitalized",
+#                                  difftime(params$DataThroughDate,onsetdate_proxy_dist, units = "days")>28 ~ "Recovered",
+#                                  TRUE ~ as.character("Active")))
+
+# ConfProbCases %>%
+#   mutate(test = difftime(INTERNALparameters$DataThroughDate,onsetdate_proxy_dist, units = "days"))
 
 
 

@@ -21,6 +21,12 @@ Case outcomes are reported according to the most severe outcome during the illne
 * Active = within 28 days of symptoms or test
 
 ```{r label=CaseOutcomes}
+ConfProbCases <- ConfProbCases %>%
+  mutate(CaseOutcome = case_when(outcome=="Patient died" ~ "Died",
+                                 hospitalized=="TRUE" ~ "Hospitalized",
+                                 difftime(params$DataThroughDate,onsetdate_proxy_dist, units = "days")>28 ~ "Recovered",
+                                 TRUE ~ as.character("Active"))) 
+
 plot_ly() %>%
   add_pie(data = ConfProbCases %>%
             group_by(CaseOutcome) %>%
@@ -37,12 +43,24 @@ plot_ly() %>%
 ```{r label=CaseOutcomesAge}
 
 ConfProbCases %>%
-  filter(month(AttributionDate)<month(Sys.Date())) %>%
+  mutate(day = day(AttributionDate),
+         month = month(AttributionDate),
+         year = year(AttributionDate)) %>%
+  filter(year(AttributionDate)<year(Sys.Date())|
+         month(AttributionDate)<month(Sys.Date())
+        |
+        ((month(AttributionDate)==month(Sys.Date())&(day<30)))
+         ) %>%
   group_by(age_group, CaseOutcome) %>%
   summarise(NumberCases = n()) %>%
   pivot_wider(names_from = CaseOutcome, values_from = NumberCases) %>%
   left_join((ConfProbCases %>%
-               filter(month(AttributionDate)<month(Sys.Date())) %>%
+               mutate(day = day(AttributionDate)) %>%
+               filter(year(AttributionDate)<year(Sys.Date())|
+                      month(AttributionDate)<month(Sys.Date())
+                      |
+                        ((month(AttributionDate)==month(Sys.Date())&(day<30)))
+                      ) %>%
                group_by(age_group) %>%
                summarise(TotalCases = n())), by = "age_group") %>%
   replace(., is.na(.), 0) %>%

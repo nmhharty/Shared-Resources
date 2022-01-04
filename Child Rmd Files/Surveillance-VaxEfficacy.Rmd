@@ -175,8 +175,10 @@ ConfProbCases%>%
   filter(breakthrough==TRUE) %>%
   group_by(AgeGrouping) %>%
   count() %>%
-  mutate(Percentage = scales::percent(n/(VaxBreakthroughList %>% count() %>% pull()))) %>%
+  mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(breakthrough==TRUE) %>% count() %>% pull()))) %>%
   kable(caption = "Age Breakdown of Vaccine Breakthrough Cases")
+
+#ADD GRAPH OF ALL ROUTT CASES BY AGE VS BREAKTHROUGH BY AGE
 
 ConfProbCases%>%
   filter(breakthrough==TRUE) %>%
@@ -221,30 +223,29 @@ hist(Hist65plus$MonthsBtwn,
 ```
 
 ```{r label=VaxBreaktrhoughDOSES, eval = params$Internal}
-DoseInfoVaxBreakthrough %>%
-  group_by(vaccination_code) %>%
-  count() %>%
-  left_join(PtIZ %>%
-              group_by(vaccination_code) %>%
-              summarise(Total = n()), by = "vaccination_code") %>%
-  mutate("Percent of Doses"= (n/Total)*100) %>%
-  kable(caption = "Doses Associated with Vaccine Breakthrough by Manufacturer")
-
-DoseInfoVaxBreakthrough %>%
-  group_by(clinic_desc) %>%
-  count() %>%
-  left_join(PtIZ %>%
-              group_by(clinic_desc) %>%
-              summarise(Total = n()), by = "clinic_desc") %>%
-  mutate("Percent of Doses"= (n/Total)*100) %>%
-  kable(caption = "Doses Associated with Vaccine Breakthrough by Clinic")
+# DoseInfoVaxBreakthrough %>%
+#   group_by(vaccination_code) %>%
+#   count() %>%
+#   left_join(PtIZ %>%
+#               group_by(vaccination_code) %>%
+#               summarise(Total = n()), by = "vaccination_code") %>%
+#   mutate("Percent of Doses"= (n/Total)*100) %>%
+#   kable(caption = "Doses Associated with Vaccine Breakthrough by Manufacturer")
+# 
+# DoseInfoVaxBreakthrough %>%
+#   group_by(clinic_desc) %>%
+#   count() %>%
+#   left_join(PtIZ %>%
+#               group_by(clinic_desc) %>%
+#               summarise(Total = n()), by = "clinic_desc") %>%
+#   mutate("Percent of Doses"= (n/Total)*100) %>%
+#   kable(caption = "Doses Associated with Vaccine Breakthrough by Clinic")
 ```
 
 ```{asis, echo=params$Internal}
 ## Booster Doses
  
 ```
-
 
 ```{r label=BoosterDoses, eval = params$Internal}
 PtIZ %>%
@@ -314,6 +315,34 @@ PtIZ %>%
   kable(caption = "Booster Recipients by Decade of Age")
 
 PtIZ %>%
+  filter(dosage_num==3, age_at_1stvaccination>=18) %>%
+  select(patient_id) %>%
+  distinct() %>%
+  count() %>%
+  mutate(JOIN = "") %>%
+  left_join(RouttPopTable2 %>%
+              filter(AGE>=18) %>%
+              summarise(POPTotal=sum(TOTAL)) %>%
+              mutate(JOIN = ""), by = "JOIN") %>%
+  select(-JOIN) %>%
+  mutate(PercentPop = scales::percent(n/POPTotal)) %>%
+  kable(caption = "3rd Dose mRNA Recipients 18+")
+
+PtIZ %>%
+  filter(dosage_num==3, age_at_1stvaccination>=65) %>%
+  select(patient_id) %>%
+  distinct() %>%
+  count() %>%
+  mutate(JOIN = "") %>%
+  left_join(RouttPopTable2 %>%
+              filter(AGE>=65) %>%
+              summarise(POPTotal=sum(TOTAL)) %>%
+              mutate(JOIN = ""), by = "JOIN") %>%
+  select(-JOIN) %>%
+  mutate(PercentPop = scales::percent(n/POPTotal)) %>%
+  kable(caption = "3rd Dose mRNA Recipients 65+")
+
+PtIZ %>%
   filter(dosage_num==3) %>%
   group_by(gender_code) %>%
   count() %>%
@@ -335,25 +364,9 @@ PtIZ %>%
   kable(caption = "Region Breakdown of Booster Recipients")
 
 
-
 ```
 
-```{r label=BoosterDosesUptake, eval = params$Internal}
-# PtIZ %>%
-#   filter(dosage_num==3) %>%
-#   select(patient_id, AgeGroup10yr, vaccination_date, vaccination_code, DoseDateWeekStart) %>%
-#   distinct() %>%
-#   group_by(DoseDateWeekStart) %>%
-#   summarise(AllAgesBoosters = n()) %>%
-#   ungroup() %>%
-#   mutate(AllAgesRunningSum = cumsum(AllAgesBoosters)) %>%
-#   left_join(PtIZ %>%
-#               filter(dosage_num==3) %>%
-#               select(patient_id, AgeGroup10yr, vaccination_date, vaccination_code, DoseDateWeekStart) %>%
-#               distinct() %>%
-#               group_by(DoseDateWeekStart, AgeGroup10yr) %>%
-#               count())
-
+```{r label=BoosterDosesUptakeWithIncidence, eval = params$Internal}
 
 BoosterDosesOverTime <- PtIZ %>%
   filter(dosage_num==3) %>%
@@ -415,6 +428,8 @@ add_trace(data = (ConfProbCases %>%
   
   layout(barmode = 'stack',
          title ="Number of Booster Doses by Age Category Overlayed with Incidence Rate",
+         margin = list(l=50,r=50,h=175),
+         legend = list(orientation = 'h', y=-.25),
          xaxis = list(
            title = "Week Start",
            font = list (family = "Arial",size = 14),
@@ -435,4 +450,43 @@ add_trace(data = (ConfProbCases %>%
   
 ```
 
+```{r label=BoosterDosesUptakeCumalativePercent, eval = params$Internal}
+
+plot_ly() %>%
+
+  add_trace(data = (BoosterDosesOverTime %>%
+                      pivot_wider(names_from = "AgeCategory", values_from = "n") %>%
+                      ungroup() %>%
+                      mutate("65+" = cumsum(`65+`),
+                             "30-64" = cumsum(`30-64`),
+                             "Under 30" = cumsum(`Under 30`)) %>%
+                      pivot_longer(2:4, names_to = "AgeGroup", values_to = "CummulativeSum")),
+          x = ~DoseDateWeekStart,
+        y = ~CummulativeSum,
+        color = ~AgeGroup,
+        colors = c('#4E2B1F', '#BB4628', "#477691"),
+        type= "bar",
+        legendgroup = ~AgeGroup
+        ) %>%
+
+  layout(barmode = 'stack',
+         title ="Cummulative Booster Doses by Age Category",
+         margin = list(l=50,r=50,h=175),
+         legend = list(orientation = 'h', y=-.25),
+         xaxis = list(
+           title = "Week Start",
+           font = list (family = "Arial",size = 14),
+           tickangle = -45,
+           type = 'category'
+           ),
+         yaxis = list (
+           title = "# People Received 3rd Dose",
+           font = list (family = "Arial",size = 14)
+           )
+         )
+
+
+#proportion of each age group boosted, side by side bar graph
+
+```
 
