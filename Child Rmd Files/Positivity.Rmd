@@ -165,7 +165,7 @@ plot_ly(data = (ConfProbCases %>%
               list(type = "rect",
                     fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
                     x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 10, y1 = 20, yref = "y")
+                    y0 = 10, y1 = 25, yref = "y")
               ),
           annotations = list(
            list(x = .2,
@@ -255,7 +255,7 @@ PCRpositivity %>%
               list(type = "rect",
                     fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
                     x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 10, y1 = 20, yref = "y")
+                    y0 = 10, y1 = 25, yref = "y")
               ),
           annotations = list(
            list(x = .2,

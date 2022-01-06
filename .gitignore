@@ -2,6 +2,7 @@
 *.html
 *.dcf
 /COVID-Data-Files
+/Child Rmd Files - Bilingual Captions
 
 # History files
 .Rhistory

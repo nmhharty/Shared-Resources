@@ -57,7 +57,7 @@ plot_ly(ConfProbCases %>%
               list(type = "rect",
                     fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
                     x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 128, y1 = 512, yref = "y1")
+                    y0 = 128, y1 = 640, yref = "y1")
               ),
           annotations = list(
            list(x = .18,

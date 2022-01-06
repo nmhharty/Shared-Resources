@@ -335,7 +335,7 @@ CaseReportForm_NOT_DrJ <- SchoolCaseReportForm2 %>%
 # 
 # range_write(ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
 #             DrJ_NOT_CaseReportForm %>%
-#               filter(DateOpened>"2021-11-29"),
+#               filter(DateOpened>"2021-12-13"),
 #             sheet = "QA Dr J Cases Not in Form",
 #             range = "A:K")
 
