@@ -52,7 +52,7 @@ plot_ly(x = ~reporteddate,
               list(type = "rect",
                     fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
                     x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 256, y1 = 768, yref = "y1")
+                    y0 = 256, y1 = 896, yref = "y1")
               ),
           annotations = list(
            list(x = .18,

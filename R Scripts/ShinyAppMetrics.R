@@ -1,6 +1,6 @@
 #Script to pull ShinyApps data for COVID dashboard
 #First authored 1/3/2021 by Nicole Harty
-#Last update: 1/6/2021
+#Last update: 1/7/2021
 
 
 library(rsconnect)
@@ -92,8 +92,12 @@ ConnectionSummary %>%
          title = "Average Daily New Connections to Dashboard By Week")
 
 #create data frame to run statistics on incidence vs daily sessions/connections
+#source ConfProbCases df 
+
+source("../Shared-Resources/R Scripts/TestResultsandCases.R")
+
 corr <- ConnectionSummary %>%
-  filter(Date>"2021-09-13", Date<"2022-01-01") %>%
+  filter(Date>"2021-09-13", Date<"2022-01-05") %>%
   mutate(WeekStart = floor_date(Date, "week", week_start = getOption("lubridate.week.start", 1))) %>%
   group_by(WeekStart) %>%
   summarise(MeanDaily = mean(TotalConnect)) %>%
@@ -105,9 +109,15 @@ corr <- ConnectionSummary %>%
                             distinct()), by = c("AttributionWeekStart" = "WeekStart")) %>%
               replace(., is.na(.), 0) %>%
               arrange(AttributionWeekStart) %>%
-              filter(AttributionWeekStart<="2022-01-01", AttributionWeekStart>"2021-09-13") %>%
+              filter(AttributionWeekStart<="2022-01-05", AttributionWeekStart>"2021-09-01") %>%
               mutate(TwoWeekCases=zoo::rollsumr(NumberCases, k = 2, fill = NA),
-                     TwoWeekRate=(TwoWeekCases/25652*100000)), by = c("WeekStart" = "AttributionWeekStart"))
+                     TwoWeekRate=(TwoWeekCases/25652*100000)), by = c("WeekStart" = "AttributionWeekStart")) %>%
+  filter(WeekStart<"2022-01-03")
+
+#histograms to check normalcy of data
+hist(corr$TwoWeekCases, breaks = c(0,100,200,300,400,500,600))
+hist(corr$MeanDaily, breaks = c(0,40,80,120,160,200,240,280))
+
 
 #correlation test of incidence vs average daily new connections/sessions
 cor.test(x = corr$MeanDaily, y = corr$TwoWeekCases, method = "pearson")
@@ -116,22 +126,17 @@ lm(corr$MeanDaily ~ corr$TwoWeekCases) %>%
   summary()
 
 #correlation scatter plot incidence vs average daily new connections/sessions
-corr %>%
-plot_ly(x = ~TwoWeekCases,
-        y = ~MeanDaily,
-        type = "scatter",
-        color = I("#4E2B1F"),
-        yaxis = "y",
-        name = "Two-Week Incidence vs Average Daily Connections, by Week") %>%
-  layout(margin = list(l=50,r=50,h=175),
-         xaxis = list(title = "Two-Week Incidence (Count)",
-                      showgrid = FALSE),
-         yaxis = list(title = "Average Daily New Connections",
-                      showgrid = FALSE),
-         legend = list(orientation = 'h', y=-.3),
-         font = list(family = "Arial", size = 12),
-         title = "Average Daily New Connections to Dashboard By Week<br>(Since September 2021) Increases as Two-Week Incidence Increases")
 
-#histograms to check normalcy of data
-hist(corr$TwoWeekCases, breaks = c(0,100,200,300,400,500,600))
-hist(corr$MeanDaily, breaks = c(0,40,80,120,160,200,240,280))
+corr %>%
+  ggplot(aes(x=TwoWeekCases, y=MeanDaily)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Two-Week Incidence (Count)", 
+       y = "Weekly Average Daily New Connections",
+       title = "Average Daily New Connections to Dashboard By Week (Since September 2021)\nIncreases as Two-Week Incidence Increases") +
+  annotate(geom = "text", x = 550, y = 75, label = "Regression Summary: \ny = .23x + 56, p<.001")
+  
+
+
+
