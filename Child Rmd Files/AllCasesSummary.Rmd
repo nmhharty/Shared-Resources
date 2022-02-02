@@ -94,6 +94,10 @@ plot_ly(x = ~AgeGrouping,
 
 ## Gender  
 
+```{r label=CollapseGenderLevels}
+ConfProbCases$gender <- fct_collapse(ConfProbCases$gender, "Unknown, Missing, or Supressed" = c("Male to Female", "Female to Male", "Unknown"))
+```
+
 ```{r label=GenderCasesPieChart2weeks}
 plot_ly() %>%
   add_pie(data = ConfProbCases %>%
@@ -124,7 +128,7 @@ plot_ly() %>%
             group_by(gender) %>%
             count(),
           labels = ~gender, values = ~n,
-          marker = list(colors = c('#4E2B1F', '#BB4628', "#477691")),
+          marker = list(colors = c('#4E2B1F', "#477691", '#BB4628')),
           name = "Cases",
           title = "Cases",
           domain = list(row = 0, column = 0)) %>%
@@ -215,9 +219,16 @@ ConfProbCases %>%
                           ZIP=="80479" ~ "South Routt",
                           ZIP=="80483" ~ "South Routt",
                           ZIP=="81639" ~ "West Routt",
-                          TRUE ~ as.character("Incomplete"))) %>%
+                          TRUE ~ as.character("Incomplete")),
+         PriorCompleteMonth = case_when(year(AttributionDate)==year(Sys.Date())&
+                                          month(AttributionDate)==(month(Sys.Date())-1) ~ "Yes",
+                                        month(Sys.Date())==1&
+                                          month(AttributionDate)==12&
+                                          year(AttributionDate)==(year(Sys.Date())-1) ~ "Yes",
+                                        TRUE ~ as.character("No"))
+         ) %>%
   group_by(City) %>%
-  filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+  filter(PriorCompleteMonth=="Yes") %>%
   summarise(NumberCases = n()) %>%
   left_join(data.frame(City=c("North Routt", "South Routt", "West Routt", "Steamboat Springs"),
                         Pop=c(706,3194,2463,17212)),
@@ -240,11 +251,24 @@ plot_ly(x = ~City,
               list(type = 'line',
                    xref = 'paper', x0=0, x1=1,
                    yref = 'y', y0=(ConfProbCases %>%
-                                     filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                                     mutate(PriorCompleteMonth = case_when(year(AttributionDate)==year(Sys.Date())&
+                                                                             month(AttributionDate)==(month(Sys.Date())-1) ~ "Yes",
+                                                                           month(Sys.Date())==1&
+                                                                             month(AttributionDate)==12&
+                                                                             year(AttributionDate)==(year(Sys.Date())-1) ~ "Yes",
+                                                                           TRUE ~ as.character("No"))) %>%
+                                     filter(PriorCompleteMonth=="Yes") %>%
                                      count() %>%
                                      mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
                                      pull(CummInc)), y1=(ConfProbCases %>%
-                                                           filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                                                           mutate(PriorCompleteMonth=
+                                                                    case_when(year(AttributionDate)==year(Sys.Date())&
+                                                                                month(AttributionDate)==(month(Sys.Date())-1) ~ "Yes",
+                                                                              month(Sys.Date())==1&
+                                                                                month(AttributionDate)==12&
+                                                                                year(AttributionDate)==(year(Sys.Date())-1) ~ "Yes",
+                                                                              TRUE ~ as.character("No"))) %>%
+                                                           filter(PriorCompleteMonth=="Yes") %>%
                                                            count() %>%
                                                            mutate(CummInc=round((n/params$RouttPop)*100000,2)) %>%
                                                            pull(CummInc)),
@@ -252,7 +276,13 @@ plot_ly(x = ~City,
          annotations = list(
            list(x = .5,
                 y = (ConfProbCases %>%
-                       filter(month(AttributionDate)==month(Sys.Date())-1) %>%
+                       mutate(PriorCompleteMonth = case_when(year(AttributionDate)==year(Sys.Date())&
+                                                               month(AttributionDate)==(month(Sys.Date())-1) ~ "Yes",
+                                                             month(Sys.Date())==1&
+                                                               month(AttributionDate)==12&
+                                                               year(AttributionDate)==(year(Sys.Date())-1) ~ "Yes",
+                                                             TRUE ~ as.character("No"))) %>%
+                       filter(PriorCompleteMonth=="Yes") %>%
                        count() %>%
                        mutate(CummInc=round((n/params$RouttPop)*100000*1.03,2)) %>%
                        pull(CummInc)),

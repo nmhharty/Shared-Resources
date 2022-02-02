@@ -12,10 +12,10 @@ output:
     css: template.css
 ---
 
-## Vaccine Efficacy, Breakthrough Cases and Reinfections  
-Clinical trials for COVID-19 vaccines were designed to assess efficacy in preventing severe disease, hospitalization, and/or death. No vaccine is 100% effective. Therefore, we expect to see vaccine breakthrough cases, and we expect to see a small proportion of cases (5-15%) among vaccinated individuals who do develop severe disease, hospitalization, or death. Identifying vaccine breakthrough relies upon data in CIIS as well as self-reported (and later verified) information gathered during case investigations.  
-  
-As time goes on, reinfections will become more prevalent. Monitoring trends in vaccine breakthrough cases and reinfections is important in understanding the greater picture of COVID-19.  
+## Vaccine Efficacy and Breakthrough Cases  
+Clinical trials for COVID-19 vaccines were designed to assess efficacy in preventing severe disease, hospitalization, and/or death. No vaccine is 100% effective. Therefore, we expect to see vaccine breakthrough cases, and we expect to see a small proportion of cases (5-15%) among vaccinated individuals who do develop severe disease, hospitalization, or death. 
+Vaccine breakthrough is defined as a positive COVID-19 test at least 14 days after completing the COVID-19 vaccination series. Identifying vaccine breakthrough relies upon data in CIIS as well as self-reported (and later verified) information gathered during case investigations.  
+ 
 
 ```{r label=VaxBreakthroughbyMonthGraph3, eval = params$Internal}
 FullyVax %>%
@@ -75,6 +75,8 @@ FullyVax %>%
 ```
 
 ```{r label=VaxBreakthroughbyMonthGraph4}
+
+#Need to add 5-11 year olds into case denom beginning January 2022
 
 FullyVax %>%
  filter(FullyVaxDateAttr>"2021-01-31") %>%
@@ -162,20 +164,6 @@ plot_ly(
 
 ```
 
-```{r label=ReinfectionBreakthroughCounts, eval = params$Internal}
-# as.tibble("Data Through (Month)" = (ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1)),
-#               "Vaccine Breakthrough Cases" = (ConfProbCases %>%  filter(breakthrough=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count() %>% pull()),
-#               "Reinfection Cases" = (ConfProbCases %>%  filter(reinfection=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count() %>% pull()),
-#               "Booster Breakthrough Cases" = (ConfProbCases %>%  filter(breakthrough_booster=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count() %>% pull())) %>%
-#   kable()
-```
-
-```{asis, echo=params$Internal}
-|Data Through (Month)|Vaccine Breakthrough Cases|Reinfection Cases|Booster Breakthrough Cases|
-|-----|-----|-----|
-|`r ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1)` |`r ConfProbCases %>%  filter(breakthrough=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count() %>% pull()` |`r ConfProbCases %>%  filter(reinfection=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count()  %>% pull()` |`r ConfProbCases %>%  filter(breakthrough_booster=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count()  %>% pull()` |
-```
-
 ```{r label=VaxBreakthroughDemos, eval = params$Internal}
 ConfProbCases%>%
   filter(breakthrough==TRUE) %>%
@@ -185,31 +173,10 @@ ConfProbCases%>%
 
 ConfProbCases%>%
   filter(breakthrough==TRUE) %>%
-  group_by(AgeGrouping, .drop=FALSE) %>%
+  group_by(AgeGrouping) %>%
   count() %>%
   mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(breakthrough==TRUE) %>% count() %>% pull()))) %>%
   kable(caption = "Age Breakdown of Vaccine Breakthrough Cases")
-
-ConfProbCases%>%
-  filter(breakthrough_booster==TRUE) %>%
-  group_by(AgeGrouping, .drop=FALSE) %>%
-  count() %>%
-  mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(breakthrough_booster==TRUE) %>% count() %>% pull()))) %>%
-  kable(caption = "Age Breakdown of Booster Breakthrough Cases")
-
-ConfProbCases%>%
-  filter(breakthrough==TRUE&reinfection==TRUE) %>%
-  group_by(AgeGrouping, .drop=FALSE) %>%
-  count() %>%
-  mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(breakthrough==TRUE&reinfection==TRUE) %>% count() %>% pull()))) %>%
-  kable(caption = "Age Breakdown of Vaccine Breakthrough Reinfection Cases")
-
-ConfProbCases%>%
-  filter(breakthrough_booster==TRUE&reinfection==TRUE) %>%
-  group_by(AgeGrouping, .drop=FALSE) %>%
-  count() %>%
-  mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(breakthrough_booster==TRUE&reinfection==TRUE) %>% count() %>% pull()))) %>%
-  kable(caption = "Age Breakdown of Booster Breakthrough Reinfection Cases")
 
 #ADD GRAPH OF ALL ROUTT CASES BY AGE VS BREAKTHROUGH BY AGE
 
@@ -219,11 +186,11 @@ ConfProbCases%>%
   count() %>%
   kable(caption = "Source of Exposure of Vaccine Breakthrough Cases")
 
-# ConfProbCases%>%
-#   filter(breakthrough==TRUE) %>%
-#   group_by(outbreakyesno) %>%
-#   count() %>%
-#   kable(caption = "Outbreak Connection for Vaccine Breakthrough Cases")
+ConfProbCases%>%
+  filter(breakthrough==TRUE) %>%
+  group_by(outbreakyesno) %>%
+  count() %>%
+  kable(caption = "Outbreak Connection for Vaccine Breakthrough Cases")
 
 
 ```
@@ -273,26 +240,6 @@ hist(Hist65plus$MonthsBtwn,
 #               summarise(Total = n()), by = "clinic_desc") %>%
 #   mutate("Percent of Doses"= (n/Total)*100) %>%
 #   kable(caption = "Doses Associated with Vaccine Breakthrough by Clinic")
-```
-
-```{r label=Reinfections, eval = params$Internal}
-ConfProbCases %>%
-  filter(reinfection=="TRUE") %>%
-  group_by(year(AttributionDate), month(AttributionDate)) %>%
-  summarise(CountReinfections = n()) %>%
-  left_join(ConfProbCases %>%
-              group_by(year(AttributionDate), month(AttributionDate)) %>%
-              summarise(TotalCases = n()), by = c("year(AttributionDate)", "month(AttributionDate)")) %>%
-  mutate(ReinfectionPercent = round((CountReinfections/TotalCases)*100,2)) %>%
-  rename(Year = "year(AttributionDate)", Month = "month(AttributionDate)") %>%
-  kable(caption = "Count and Percentage of Reinfections by Month")
-
-ConfProbCases%>%
-  filter(reinfection==TRUE) %>%
-  group_by(AgeGrouping, .drop=FALSE) %>%
-  count() %>%
-  mutate(Percentage = scales::percent(n/(ConfProbCases %>% filter(reinfection==TRUE) %>% count() %>% pull()))) %>%
-  kable(caption = "Age Breakdown of Reinfection Cases")
 ```
 
 ```{asis, echo=params$Internal}

@@ -12,11 +12,10 @@ output:
     css: template.css
 ---
 
-## Routt's Road to Recovery    
-Routt's Road to Recovery uses 14-day metrics like in Dial 1.0 rather than 7-day metrics of Dial 2.0 and Dial 3.0.   
-
 ```{r label = GaugeCDPHE14day, out.height="400px"}
 #reference is the prior two weeks
+##1/28/2022 realized the positivity calculation here has not been updated to exclude probable cases without a test from the numerator. Corrected this. 
+#It lead to higher than reality positivity and did not match positivity line graph.
 
 plot_ly() %>%
 #Incidence
@@ -40,11 +39,11 @@ plot_ly() %>%
     font = list(size = 12)),
   gauge = list(
     shape = "bullet",
-    axis = list(range = c(0, 832)),
+    axis = list(range = c(0, 896)),
     steps = list(
       list(range = c(0, 52), color = "rgb(71, 118, 145)"),
       list(range = c(52, 256), color = "rgb(187, 70, 40)"),
-      list(range = c(256, 832), color = "rgb(78, 43, 31)")
+      list(range = c(256, 896), color = "rgb(78, 43, 31)")
       ),
     # height = 150,
     bgcolor = "white",
@@ -53,7 +52,7 @@ plot_ly() %>%
   add_trace(type = "indicator",
   mode = "number+gauge+delta",
   value = (ConfProbCases %>% 
-             filter(IsMostRecent2WeeksRolling=="Yes") %>%
+             filter(IsMostRecent2WeeksRolling=="Yes", !is.na(collectiondate)) %>%
              group_by(IsMostRecent2WeeksRolling,AttributionDate) %>%
              summarise(Cases = n()) %>%
              full_join(DeDupNonAntibodyTests %>%
@@ -70,7 +69,7 @@ plot_ly() %>%
   domain = list(x = c(0, 1), y = c(.4, .5)),
   delta = list(reference = (round(
                             (ConfProbCases %>% 
-                               filter(IsMostRecent2WeekComparison=="Yes") %>%
+                               filter(IsMostRecent2WeekComparison=="Yes", !is.na(collectiondate)) %>%
                               summarise(Cases = n())) / 
                               (DeDupNonAntibodyTests %>%
                                           filter(IsMostRecent2WeekComparison=="Yes") %>%

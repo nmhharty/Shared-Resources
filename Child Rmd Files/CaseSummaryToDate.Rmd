@@ -43,4 +43,5 @@ ConfProbCases %>%
 ConfProbCases %>% 
   filter(AttributionDate<=(as.Date(params$DataThroughDate)), outcome=="Patient died") %>%
   select(eventid, first_name, last_name, AttributionDate)
+
 ```

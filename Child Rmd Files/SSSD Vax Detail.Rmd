@@ -18,7 +18,7 @@ Limitations:
 **Last updated: 9/17/2021**
 
 ```{r label=SSSDvaxRates}
-SSSDvaxRate <- read.xlsx("../SSSD Vax Info/SSSD_SchoolVaxRate.xlsx", startRow = 4, sep.names = " ")
+SSSDvaxRate <- read.xlsx("../SSSD Vax Info/SSSDVaxSummary.xlsx")
 SSSDvaxRate <- SSSDvaxRate %>%
   head(nrow(SSSDvaxRate) - 1)
 SSSDvaxRate[,c(5:7,9:11)] <- lapply(SSSDvaxRate[,c(5:7,9:11)], scales::percent)

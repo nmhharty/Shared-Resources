@@ -39,11 +39,11 @@ DrJSchoolCases$EventID <- as.numeric((DrJSchoolCases$EventID))
 #load data from Google Spreadsheet
 gs4_auth(email = "routtcodph@gmail.com")
 SchoolCaseReportForm <- range_read("https://docs.google.com/spreadsheets/d/1IS5XZL6i4xsnJEegykJYlik6BARRfetXbrQvpMYRd4g/edit?resourcekey#gid=164583539",
-                                   sheet = 1, range = "A:P") %>%
+                                   sheet = 1, range = "A:Q") %>%
   filter(Timestamp>"2021-10-08")
 
 #clean up column names
-colnames(SchoolCaseReportForm) <- c("Timestamp","Email","School","Name", "DOB","PrimaryContact","PrimaryContactPhoneNumber", "TestDate", "TestType",
+colnames(SchoolCaseReportForm) <- c("RCPH Review","Timestamp","Email","School","Name", "DOB","PrimaryContact","PrimaryContactPhoneNumber", "TestDate", "TestType",
                                     "Role","Grade","LastDaySchool","SymptomOnset","Extracurriculars","Notes","ContactPersonEmail")
 
 SchoolCaseReportForm$School <- factor(SchoolCaseReportForm$School, levels = c("Hayden Elementary","Hayden Secondary","North Routt Charter","Sleeping Giant",
@@ -78,7 +78,7 @@ SchoolCaseReportForm$District <- factor(SchoolCaseReportForm$District, levels = 
 
 #format dates as just date, not timestamp
 #colnames(SchoolCaseReportForm)
-SchoolCaseReportForm[,c(7,10,14,15,19:21)] <- lapply(SchoolCaseReportForm[,c(7,10,14,15,19:21)], as.Date.POSIXct, format = "%D")
+SchoolCaseReportForm[,c(8,11,15,16,20:22)] <- lapply(SchoolCaseReportForm[,c(8,11,15,16,20:22)], as.Date.POSIXct, format = "%D")
 
 #move contact person email
 SchoolCaseReportForm <- SchoolCaseReportForm %>%
@@ -111,74 +111,74 @@ sheet_write(SchoolFormPostProcessing,
 
 # SSSD Cases Google Sheets
 # gs4_create(name = "SSSD Cases Reported to Public Health", sheets = SchoolCaseReportForm %>% filter(District=="SSSD")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="SSSD"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="SSSD"), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "All Cases")  #this updates the existing sheet
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Sleeping Giant", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Sleeping Giant", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "Sleeping Giant") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Soda Creek", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Soda Creek", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "Soda Creek") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Steamboat High", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Steamboat High", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "High School") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Steamboat Middle", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Steamboat Middle", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "Middle School")
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Strawberry Park", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Strawberry Park", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "Strawberry Park")
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Yampa Valley High School", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Yampa Valley High School", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/13BngoXXlYP7vxHvZGQAV6XZWFYO_ovpsOUO8U7MxkqM/edit", 
             sheet = "Yampa Valley HS")
 
 
 # Hayden Cases Google Sheets
 # gs4_create(name = "Hayden Schools Cases Reported to Public Health", sheets = SchoolFormPostProcessing %>% filter(District=="Hayden")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="Hayden"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="Hayden"), 
             ss = "https://docs.google.com/spreadsheets/d/1BZgy_2MLKOkAZgRM7Jc2c9WCZIkWVa8t6uRSLb-wb08/edit#gid=1989430456", 
             sheet = "All Cases")  #this updates the existing sheet
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Hayden Elementary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Hayden Elementary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1BZgy_2MLKOkAZgRM7Jc2c9WCZIkWVa8t6uRSLb-wb08/edit#gid=1989430456", 
             sheet = "Hayden Elementary") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="Hayden Secondary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="Hayden Secondary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1BZgy_2MLKOkAZgRM7Jc2c9WCZIkWVa8t6uRSLb-wb08/edit#gid=1989430456", 
             sheet = "Hayden Secondary") 
 
 # SOROCO Cases Google Sheets
 # gs4_create(name = "SOROCO Schools Cases Reported to Public Health", sheets = SchoolFormPostProcessing %>% filter(District=="SOROCO")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="SOROCO"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="SOROCO"), 
             ss = "https://docs.google.com/spreadsheets/d/1ZZVAeT6AModserUl83daYh3RkIoFAoOUcIUgwp8SbjA/edit#gid=871158826", 
             sheet = "All Cases")  #this updates the existing sheet
-sheet_write(SchoolFormPostProcessing %>% filter(School=="South Routt Elementary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="South Routt Elementary", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1ZZVAeT6AModserUl83daYh3RkIoFAoOUcIUgwp8SbjA/edit#gid=871158826", 
             sheet = "Elementary") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="SOROCO High", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="SOROCO High", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1ZZVAeT6AModserUl83daYh3RkIoFAoOUcIUgwp8SbjA/edit#gid=871158826", 
             sheet = "High") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="SOROCO Middle", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="SOROCO Middle", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1ZZVAeT6AModserUl83daYh3RkIoFAoOUcIUgwp8SbjA/edit#gid=871158826", 
             sheet = "Middle") 
-sheet_write(SchoolFormPostProcessing %>% filter(School=="SOROCO Preschool at Yampa", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(School=="SOROCO Preschool at Yampa", Role %in% c("Teacher", "Staff", "Student", "Bus Driver", "Sports Participant")), 
             ss = "https://docs.google.com/spreadsheets/d/1ZZVAeT6AModserUl83daYh3RkIoFAoOUcIUgwp8SbjA/edit#gid=871158826", 
             sheet = "Preschool") 
 
 # NRCCS Cases Google Sheets
 # gs4_create(name = "NRCCS Schools Cases Reported to Public Health", sheets = SchoolFormPostProcessing %>% filter(District=="NRCCS")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="NRCCS"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="NRCCS"), 
             ss = "https://docs.google.com/spreadsheets/d/1tVVsbr6v3YfqHtKjYK1OBqpQVnIQNqXsbBdrBuKk_E4/edit#gid=301098889", 
             sheet = "All Cases")  #this updates the existing sheet
 
 # Montessori Cases Google Sheets
 # gs4_create(name = "Montessori Schools Cases Reported to Public Health", sheets = SchoolFormPostProcessing %>% filter(District=="Montessori")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="Montessori"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="Montessori"), 
             ss = "https://docs.google.com/spreadsheets/d/1Ehrl9vqbfLi9q75sk6fQNXlUPImbjBJ2hSj5qfgrtHA/edit#gid=1713156505", 
             sheet = "All Cases")  #this updates the existing sheet
 
 # Mountain School Cases Google Sheets
 # gs4_create(name = "Mountain School Schools Cases Reported to Public Health", sheets = SchoolFormPostProcessing %>% filter(District=="Mountain School")) #this creates the sheet the first time
-sheet_write(SchoolFormPostProcessing %>% filter(District=="Mountain School"), 
+sheet_write(SchoolFormPostProcessing %>% select(-1) %>% filter(District=="Mountain School"), 
             ss = "https://docs.google.com/spreadsheets/d/1-42rS7LkbzGP4C1R7db8Uiwf0TWC29SMOEGz3sDNXfw/edit#gid=1163719338", 
             sheet = "All Cases")  #this updates the existing sheet
 

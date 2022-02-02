@@ -33,7 +33,7 @@ DrJ$EventID <- as.numeric((DrJ$EventID))
 
 # School COVID Case Report Import ----------------------------
 SchoolCaseReportForm2 <- range_read("https://docs.google.com/spreadsheets/d/1IS5XZL6i4xsnJEegykJYlik6BARRfetXbrQvpMYRd4g/edit?resourcekey#gid=164583539",
-                                    sheet = 1) %>%
+                                    sheet = 1, range = "B:R") %>%
   filter(Timestamp>"2021-10-10")
 
 # Join Dr J and CEDRS -----------------------------------------------------
@@ -44,6 +44,8 @@ DRJcedrs <- DrJ %>%
               select(eventid, profileid, casestatus, gender, date_of_birth, city, zipcode, hospitalized, onsetdate, earliest_collectiondate, 
                      AttributionDate, reporteddate, AttributionWeekStart), by = c("EventID" = "eventid")) %>%
   filter(FinalDisposition %in% c("reached_completed", "reached_not_completed", "unreachable", "", "investigation_not_attempted"))
+
+
 
 #Add to DrJ data frame employer/school name from CEDRS for those where it matches (this is to include the CDE data)
 ## 10/18/2021 MUST USE NOVELCORONAVIRUS REPORT FOR THIS SO NEED TO REVISIT

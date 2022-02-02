@@ -70,11 +70,18 @@ FullyVax <- PtIZ %>%
   distinct() %>%
   mutate(FullyVaxDate = vaccination_date+14,
          # FullyVaxDateMonth = month(FullyVaxDate),
-         FullyVaxDateAttr = case_when(month(FullyVaxDate)==12 ~ as.Date(paste0((year(FullyVaxDate)+1),"-01","-01")),
-                                      month(FullyVaxDate)<12 ~ as.Date(paste0(year(FullyVaxDate),"-",(month(FullyVaxDate)+1),"-01"))
-         ),
+         FullyVaxDateAttr = case_when(month(FullyVaxDate)==12 ~ (paste0((year(FullyVaxDate)+1),"-01","-01")),
+                                      month(FullyVaxDate)<12 ~ (paste0(year(FullyVaxDate),"-",(month(FullyVaxDate)+1),"-01"))),
+         FullyVaxDateAttr = as.Date(FullyVaxDateAttr),
          FullyVaxWeekStart = floor_date(FullyVaxDate, "week", week_start = getOption("lubridate.week.start", 1)),
-         FullyVaxWeekAttr = FullyVaxWeekStart+7)
+         FullyVaxWeekAttr = FullyVaxWeekStart+7
+         )
+# FullyVax %>%
+#   mutate(FullyVaxDateAttr = case_when(month(FullyVaxDate)<12 ~ (paste0(year(FullyVaxDate),"-",(month(FullyVaxDate)+1),"-01")))) %>%
+#   filter(month(FullyVaxDate)!=12) %>%
+#   select(FullyVaxDateAttr) %>%
+#   distinct() %>%
+#   mutate(isDate = as.Date(FullyVaxDateAttr))
 
 
 #identify VACCINE BREAKTHROUGH

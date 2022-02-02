@@ -110,8 +110,8 @@ DeDupNonAntibodyTests <- NonAntibodyTests %>%
 # Clean up Cases Data Frame -----------------------------------------------
 
 #colnames(CasesRaw)
-CasesRaw[,c(1,4,8:9,15,18,19:31,34:37,39:43,46,50:52)] <- lapply(CasesRaw[,c(1,4,8:9,15,18,19:31,34:37,39:43,46,50:52)], as.factor)
-CasesRaw[,c(7,10:14,16,47:49)] <- lapply(CasesRaw[,c(7,10:14,16,47:49)], as.Date.character)
+CasesRaw[,c(1,4,8:9,15,18,19:31,34:37,39:43,46,51:55)] <- lapply(CasesRaw[,c(1,4,8:9,15,18,19:31,34:37,39:43,46,51:55)], as.factor)
+CasesRaw[,c(7,10:14,16,47:50)] <- lapply(CasesRaw[,c(7,10:14,16,47:50)], as.Date.character)
 
 
 ##***Need to merge together specimen collection dates because not all PCR tests are specimen 1
@@ -121,8 +121,9 @@ AllCases <- CasesRaw %>%
          ReportedWeekStart = floor_date(reporteddate, "week", week_start = getOption("lubridate.week.start", 1)),
          CollectionDateWeek = isoweek(earliest_collectiondate), 
          CollectionWeekStart = floor_date(earliest_collectiondate, "week", week_start = getOption("lubridate.week.start", 1)),
-         AgeGrouping = cut(age_at_reported, breaks=c(0,9,19,29,39,49,59,69,79,89,130), 
-                           labels=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+")))
+         AgeGrouping = cut(age_at_reported, breaks=c(0,9,19,29,39,49,59,69,79,89,130),
+                           labels=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+"))
+         )
 
 AllCases$gender <- fct_explicit_na(AllCases$gender)
 

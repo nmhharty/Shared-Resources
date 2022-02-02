@@ -13,7 +13,6 @@ output:
 ---
 
 ## Positivity  
-This graph shows the 14-day rolling average positivity rate (line). 
 
 ```{r label=PositivityComparisonPREP}
 PCRpositivity <- ConfProbCases %>%
@@ -111,96 +110,6 @@ CHILDpositivity <- ConfProbCases %>%
          Rolling14DayPositivityCHILDREN = (Sum14DayCases/Sum14DayTests)*100)
 ```
 
-```{r label=Rolling14DayPositivity}
-
-plot_ly(data = (ConfProbCases %>%
-                    filter(!is.na(collectiondate)) %>%
-                    group_by(AttributionDate) %>%
-                    summarise(Cases = n()) %>%
-                    full_join(DeDupNonAntibodyTests %>%
-                                group_by(collectiondate) %>%
-                                summarise(TotalTests = n()),
-                              by = c("AttributionDate" = "collectiondate")) %>%
-                    #  replace(., is.na(.), 0) %>%
-                    right_join((Calendar %>%
-                                  select(date) %>%
-                                  filter(date>"2020-02-29"&date<=(params$DataThroughDate))), by = c("AttributionDate" = "date")) %>%
-                    replace(., is.na(.), 0) %>%
-                    arrange(AttributionDate) %>%
-                    mutate(Sum14DayCases = zoo::rollsumr(Cases, k=14, fill=NA, na.rm=TRUE),
-                           Sum14DayTests = zoo::rollsumr(TotalTests, k=14, fill = NA, na.rm=TRUE),
-                           Rolling14DayPositivity = (Sum14DayCases/Sum14DayTests)*100)
-                          # DailyPositivity=(Cases/TotalTests)*100,
-                          #  Rolling14DayPositivity=zoo::rollmeanr(DailyPositivity, k = 14, fill = NA, na.rm=TRUE))
-                          ),
-          x = ~AttributionDate,
-          y = ~Rolling14DayPositivity,
-          type = "scatter",
-          name = "Rolling 14-day Positivity Rate",
-          yaxis = "y",
-          mode = "lines",
-          color = I("#4E2B1F")) %>%
-  layout(margin = list(l=50,r=50,b=155,h=175),
-         title = "Rolling 14-day Positivity",
-         xaxis = list(type = 'date',
-                      tickformat = "%b %d, %Y",
-                      autotick = F, 
-                      tickangle = 45,
-                      tick0 = "2000-01-10",
-                      dtick = 1209600000,
-                      title = "Week Start (all dates are Mondays)",
-                      showgrid = FALSE),
-         yaxis = list(title = "Positivity Rate (%)"),
-         legend = list(orientation = 'h', y=-.3),
-         font = list(family = "Arial", size = 12),
-                shapes = list(
-                list(type = "rect",
-                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 0, y1 = 5, yref = "y"),
-              list(type = "rect",
-                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 5, y1 = 10, yref = "y"),
-              list(type = "rect",
-                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 10, y1 = 25, yref = "y")
-              ),
-          annotations = list(
-           list(x = .2,
-                y = 2.5,
-                text = "Low Risk",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#477691")),
-           list(x = .2,
-                y = 7.5,
-                text = "Caution",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#BB4628")),
-           list(x = .2,
-                y = 15,
-                text = "High Risk",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
-           list(x = .0,
-                y = .5,
-                text = "Data prepared by Routt County Public Health",
-                xref = "paper",
-                yref = 'paper',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "gray"))
-            )
-         )
-
-``` 
-
 The graph below compares test positivity among all tests (PCR and non-home test antigen) to that of PCR tests and antigen tests alone. Comparing positivity among antigen tests and PCR tests is important because schools in the Steamboat Springs area began their weekly surveillance testing program that uses antigen tests in early October. The implementation of this program impacted the test positivity resulting in the overall Routt County test positivity calculated using both antigen and PCR tests no longer aligning closely with the calculation CDPHE has with just PCR tests.  
 
 ```{r label=PositivityComparisonTestType}
@@ -243,42 +152,7 @@ PCRpositivity %>%
          yaxis = list(title = "Positivity Rate (%)"),
          legend = list(orientation = 'h', y=-.3),
          font = list(family = "Arial", size = 12),
-                shapes = list(
-                list(type = "rect",
-                    fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 0, y1 = 5, yref = "y"),
-              list(type = "rect",
-                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 5, y1 = 10, yref = "y"),
-              list(type = "rect",
-                    fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
-                    x0 = 0, x1 = 1, xref = "paper",
-                    y0 = 10, y1 = 25, yref = "y")
-              ),
-          annotations = list(
-           list(x = .2,
-                y = 2.5,
-                text = "Low Risk",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#477691")),
-           list(x = .2,
-                y = 7.5,
-                text = "Caution",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#BB4628")),
-           list(x = .2,
-                y = 15,
-                text = "High Risk",
-                xref = "paper",
-                yref = 'y',
-                showarrow = FALSE,
-                font = list(family = "Arial", size = 12, color = "#4E2B1F")),
+                annotations = list(
            list(x = .0,
                 y = .5,
                 text = "Data prepared by Routt County Public Health",
@@ -292,90 +166,55 @@ PCRpositivity %>%
 ```
 
 ```{r label=PositivityComparisonAgeGroup, eval = params$Internal}
-# PCRpositivity %>%
-#   select(AttributionDate, Rolling14DayPositivityPCR) %>%
-#   left_join(ANITGENpositivity %>% 
-#               select(AttributionDate, Rolling14DayPositivityANTIGEN), by = "AttributionDate") %>%
-#   filter(AttributionDate>="2020-09-21") %>%
-#   plot_ly(x = ~AttributionDate,
-#           y = ~Rolling14DayPositivityPCR,
-#           type = "scatter",
-#           color = I("#4E2B1F"),
-#           mode = "lines",
-#           yaxis = "y",
-#           name = "PCR Positivity") %>%
-#   add_trace(x = ~AttributionDate,
-#             y = ~Rolling14DayPositivityANTIGEN,
-#             type = "scatter",
-#             name = "Antigen Positiviity",
-#             mode = "lines",
-#             color = I("#BB4628")) %>%
-#   add_trace(data = POStxtTable %>%
-#               filter(AttributionDate>="2020-09-21"),
-#             x = ~AttributionDate,
-#             y = ~Rolling14DayPositivity,
-#             type = "scatter",
-#             name = "Overall Positiviity",
-#             mode = "lines",
-#             color = I("#F2BF4C")) %>%
-#   layout(margin = list(l=50,r=50,b=155,h=175),
-#          title = "Rolling 14-day Positivity by Test Type Compared to County Total",
-#          xaxis = list(type = 'date',
-#                       tickformat = "%b %d, %Y",
-#                       autotick = F, 
-#                       tickangle = 45,
-#                       tick0 = "2000-01-10",
-#                       dtick = 1209600000,
-#                       title = "Week Start (all dates are Mondays)",
-#                       showgrid = FALSE),
-#          yaxis = list(title = "Positivity Rate (%)"),
-#          legend = list(orientation = 'h', y=-.3),
-#          font = list(family = "Arial", size = 12),
-#                 shapes = list(
-#                 list(type = "rect",
-#                     fillcolor = 'rgb(71, 118, 145)', line = list(color = 'rgb(71, 118, 145)'), opacity = 0.4,
-#                     x0 = 0, x1 = 1, xref = "paper",
-#                     y0 = 0, y1 = 5, yref = "y"),
-#               list(type = "rect",
-#                     fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
-#                     x0 = 0, x1 = 1, xref = "paper",
-#                     y0 = 5, y1 = 10, yref = "y"),
-#               list(type = "rect",
-#                     fillcolor = 'rgb(78, 43, 31)', line = list(color = 'rgb(78, 43, 31)'), opacity = 0.4,
-#                     x0 = 0, x1 = 1, xref = "paper",
-#                     y0 = 10, y1 = 20, yref = "y")
-#               ),
-#           annotations = list(
-#            list(x = .2,
-#                 y = 2.5,
-#                 text = "Low Risk",
-#                 xref = "paper",
-#                 yref = 'y',
-#                 showarrow = FALSE,
-#                 font = list(family = "Arial", size = 12, color = "#477691")),
-#            list(x = .2,
-#                 y = 7.5,
-#                 text = "Caution",
-#                 xref = "paper",
-#                 yref = 'y',
-#                 showarrow = FALSE,
-#                 font = list(family = "Arial", size = 12, color = "#BB4628")),
-#            list(x = .2,
-#                 y = 15,
-#                 text = "High Risk",
-#                 xref = "paper",
-#                 yref = 'y',
-#                 showarrow = FALSE,
-#                 font = list(family = "Arial", size = 12, color = "#4E2B1F")),
-#            list(x = .0,
-#                 y = .5,
-#                 text = "Data prepared by Routt County Public Health",
-#                 xref = "paper",
-#                 yref = 'paper',
-#                 showarrow = FALSE,
-#                 font = list(family = "Arial", size = 12, color = "gray"))
-#             )
-#          )
+ADULTpositivity %>%
+  select(AttributionDate, Rolling14DayPositivityADULTS) %>%
+  left_join(CHILDpositivity %>%
+              select(AttributionDate, Rolling14DayPositivityCHILDREN), by = "AttributionDate") %>%
+  filter(AttributionDate>="2020-09-21") %>%
+  plot_ly(x = ~AttributionDate,
+          y = ~Rolling14DayPositivityADULTS,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          yaxis = "y",
+          name = "ADULT Positivity (18+)") %>%
+  add_trace(x = ~AttributionDate,
+            y = ~Rolling14DayPositivityCHILDREN,
+            type = "scatter",
+            name = "CHILD Positiviity (<18)",
+            mode = "lines",
+            color = I("#BB4628")) %>%
+  add_trace(data = POStxtTable %>%
+              filter(AttributionDate>="2020-09-21"),
+            x = ~AttributionDate,
+            y = ~Rolling14DayPositivity,
+            type = "scatter",
+            name = "Overall Positiviity",
+            mode = "lines",
+            color = I("#F2BF4C")) %>%
+  layout(margin = list(l=50,r=50,b=155,h=175),
+         title = "Rolling 14-day Positivity by Age Group Compared to County Total",
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F,
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1209600000,
+                      title = "Week Start (all dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "Positivity Rate (%)"),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+                annotations = list(
+           list(x = .0,
+                y = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
 
 ```
 

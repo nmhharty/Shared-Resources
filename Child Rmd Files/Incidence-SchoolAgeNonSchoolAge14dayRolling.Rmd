@@ -13,8 +13,13 @@ output:
 ---
 
 ## Incidence: School Age vs Non-School Age  
-```{r label=RegionalRolling2WeekIncidenceNONSCHOOLAGESvsSCHOOLAGE}
-plot_ly(DRJcedrs %>%
+```{r label=RegionalRolling2WeekIncidenceNONSCHOOLAGESvsSCHOOLAGE_CONFPROB}
+#initially this graph was generated using the DrJschools df and sourced case data from Dr J rather than CEDRS. But the adult age data was incorrect once 
+#Omicron surge meant we did not investigate many adult cases. Checking the filters for final_disposition did not rectify so changed to CEDRS data
+ConfProbCases <- ConfProbCases %>%
+  mutate(SchoolAge = case_when(age_at_reported>4&age_at_reported<18 ~ "Yes",
+                               TRUE ~ as.character("No")))
+plot_ly(ConfProbCases %>%
   filter(SchoolAge=="Yes") %>%
   group_by(AttributionDate) %>%
   summarise(SCHOOLAGE = n()) %>%
@@ -32,7 +37,7 @@ plot_ly(DRJcedrs %>%
           mode = "lines",
           yaxis = "y",
           name = "School Age Routt County Residents, <br>ages 5-17") %>%
-add_trace(data = (DRJcedrs %>%
+add_trace(data = (ConfProbCases %>%
                     filter(SchoolAge=="No") %>%
   group_by(AttributionDate) %>%
   summarise(ROUTT = n()) %>%
@@ -74,4 +79,3 @@ add_trace(data = (DRJcedrs %>%
             )
          )
 ```
-  

@@ -13,12 +13,12 @@ output:
 ---
 
 # Outbreaks{#Outbreaks}   
-Outbreaks included here include both confirmed and suspected outbreaks with a start date on or after 9/1/2020. Outbreak status is determined based upon epidemiologic case definition. Only confirmed outbreaks are reported by CDPHE. The bar chart shows the number of all outbreaks within a specific sector. The box-and-whisker plot shows the median (horizontal line within each box), upper and lower quartiles (top and bottom each box), minimum and maximum (vertical lines), and outliers (dots above or below the box).     
+Outbreaks included here include both confirmed and suspected outbreaks with a start date on or after 9/1/2020. Outbreak status is determined based upon epidemiologic case definition. Only confirmed outbreaks are reported by CDPHE. The box-and-whisker plot shows the median (horizontal line within each box), upper and lower quartiles (top and bottom each box), minimum and maximum (vertical lines), and outliers (dots above or below the box).     
 On July 1, 2021, CDPHE updated the outbreak definition to be 5 or more cases in most settings. Two or more cases in residential care settings or correctional facilities continue to meet outbreak definition.    
 **NOTE**: Congregate Living is a dormitory, long-term care facility, correctional facility, or group home.  
 
 
-```{r label=OutbreaksBarChartCount}
+```{r label=OutbreaksBarChartCount, eval=params$Internal}
 
 Outbreaks %>%
             filter(Status!="Under Investigation", `Start Date`<=(params$DataThroughDate)) %>%

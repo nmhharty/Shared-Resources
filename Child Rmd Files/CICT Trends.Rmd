@@ -20,7 +20,7 @@ attr(PHtracking$ReportedDate, "tzone") <- "America/Denver"
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-11-08") %>%
+  filter(ReportedWeekStart>="2021-12-13") %>%
   group_by(ReportedWeekStart, `Day of Week`, AMorPM) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -29,14 +29,14 @@ plot_ly(x = ~`Day of Week`,
         color = ~AMorPM,
       #  boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Nov 8",
+layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Dec 13",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-11-08") %>%
+  filter(ReportedWeekStart>="2021-12-13") %>%
   group_by(ReportedWeekStart, `Day of Week`) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -44,7 +44,7 @@ plot_ly(x = ~`Day of Week`,
         type = 'box',
        # boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week Since Nov 8",
+layout(title = "Number of Cases Reported Each Day, by Day of Week Since Dec 13",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
