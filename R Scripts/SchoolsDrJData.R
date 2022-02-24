@@ -1,6 +1,6 @@
 #Script to load Dr J data and School Case Report data for schools analysis
 #First authored 9/3/2021 by Nicole Harty
-#Last update: 11/9/2021
+#Last update: 2/10/2021
 
 
 # Pull from JUSTINA SQL database ------------------------------------------
@@ -42,9 +42,8 @@ SchoolCaseReportForm2 <- range_read("https://docs.google.com/spreadsheets/d/1IS5
 DRJcedrs <- DrJ %>%
   left_join(ConfProbCases %>%
               select(eventid, profileid, casestatus, gender, date_of_birth, city, zipcode, hospitalized, onsetdate, earliest_collectiondate, 
-                     AttributionDate, reporteddate, AttributionWeekStart), by = c("EventID" = "eventid")) %>%
+                     AttributionDate, reporteddate, AttributionWeekStart, ), by = c("EventID" = "eventid")) %>%
   filter(FinalDisposition %in% c("reached_completed", "reached_not_completed", "unreachable", "", "investigation_not_attempted"))
-
 
 
 #Add to DrJ data frame employer/school name from CEDRS for those where it matches (this is to include the CDE data)
@@ -337,7 +336,55 @@ CaseReportForm_NOT_DrJ <- SchoolCaseReportForm2 %>%
 # 
 # range_write(ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1114427213",
 #             DrJ_NOT_CaseReportForm %>%
-#               filter(DateOpened>"2021-12-13"),
+#               filter(DateOpened>"2022-01-03"),
+#             sheet = "QA Dr J Cases Not in Form",
+#             range = "A:K")
+
+
+# Adding School Name from CEDRS Surveillance Report -----------------------
+#UNCOMMENT THIS TO UPDATE
+
+# 
+# first, dealing with QA list as it exists 2/10/2022
+# CasesSurveilReport <- read.xlsx("T:/COVID R Files/Shared-Resources/COVID-Data-Files/SurveillanceFormSchoolUpdate20220210.xlsx")
+# SchoolAgeSurveilReportCEDRS <- CasesSurveilReport %>%
+#   filter(Age>4&Age<19) %>%
+#   select(EventID,FirstName,LastName,BirthDate,EmployerName1,EmployerName2,EmployerName3)
+#   
+# DataQA20220210 <- range_read("https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1566920461",
+#                                     sheet = 5) %>%
+#   filter(is.na(ReviewComplete)|ReviewComplete=="no school")
+# 
+# CEDRSupdateDataQA20220210 <- DataQA20220210 %>%
+#   left_join(SchoolAgeSurveilReportCEDRS %>%
+#               select(EventID,EmployerName1,EmployerName2,EmployerName3), by = c("EventID")) %>%
+#   relocate(ReviewComplete, .after = last_col())
+# 
+# sheet_write(CEDRSupdateDataQA20220210, ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1566920461",
+#             sheet = "QA Dr J Cases with CEDRS School Info")  #this creates new tab for CEDRS-joined data for QA that includes more school info
+
+
+
+#then setting up to be able to add in this school name info ongoing
+# CasesSurveilReport <- read.xlsx("T:/COVID R Files/Shared-Resources/COVID-Data-Files/SurveillanceFormSchoolUpdate.xlsx")
+# SchoolAgeSurveilReportCEDRS <- CasesSurveilReport %>%
+#   filter(Age>4&Age<19) %>%
+#   select(EventID,FirstName,LastName,BirthDate,EmployerName1,EmployerName2,EmployerName3)
+#   
+#DataQA <- range_read("https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1566920461",
+#                                     sheet = 5) %>%
+#   filter(is.na(ReviewComplete)|ReviewComplete=="no school")
+# 
+# CEDRSupdateDataQA <- DataQA %>%
+#   left_join(SchoolAgeSurveilReportCEDRS %>%
+#               select(EventID,EmployerName1,EmployerName2,EmployerName3), by = c("EventID")) %>%
+#   relocate(ReviewComplete, .after = last_col())
+
+#UNCOMMENT THIS TO UPDATE
+# 
+# range_write(ss = "https://docs.google.com/spreadsheets/d/1G-bG7pL5jG7B6Qv6bEi2RG2imN2MVFMRErpenUF5Hkg/edit#gid=1566920461",
+#             CEDRSupdateDataQA %>%
+#               filter(DateOpened>"2022-01-03"),
 #             sheet = "QA Dr J Cases Not in Form",
 #             range = "A:K")
 

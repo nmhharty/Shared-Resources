@@ -170,11 +170,12 @@ plot_ly(
 #   kable()
 ```
 
-```{asis, echo=params$Internal}
-|Data Through (Month)|Vaccine Breakthrough Cases|Reinfection Cases|Booster Breakthrough Cases|
-|-----|-----|-----|
+
+|Data Through|Vaccine Breakthrough Cases|Reinfection Cases|Booster Breakthrough Cases|
+|:-----:|:-----:|:-----:|:-----:|
 |`r ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1)` |`r ConfProbCases %>%  filter(breakthrough=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count() %>% pull()` |`r ConfProbCases %>%  filter(reinfection=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count()  %>% pull()` |`r ConfProbCases %>%  filter(breakthrough_booster=="TRUE") %>% filter(AttributionDate<=(ceiling_date(as.Date(Sys.Date()), "month") - months(1) - days(1))) %>% count()  %>% pull()` |
-```
+See the [References and Definitions](#Definitions) for definitions of these numbers.  
+Rates for reinfection and breakthrough cases are for Routt County residents only. These should be considered incomplete, initial findings, not as a tool to determine vaccine effectiveness. Studies about the effectiveness of vaccines: <a href="https://www.cdc.gov/coronavirus/2019-ncov/vaccines/effectiveness/work.html" target="_blank">https://www.cdc.gov/coronavirus/2019-ncov/vaccines/effectiveness/work.html</a>.  
 
 ```{r label=VaxBreakthroughDemos, eval = params$Internal}
 ConfProbCases%>%
@@ -415,7 +416,6 @@ PtIZ %>%
                                         summarise(POPtotal=sum(Pop)) %>%
                                      pull(POPtotal))) %>%
   kable(caption = "Region Breakdown of Booster Recipients")
-
 
 ```
 
