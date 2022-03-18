@@ -20,7 +20,7 @@ attr(PHtracking$ReportedDate, "tzone") <- "America/Denver"
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-12-13") %>%
+  filter(ReportedWeekStart>="2022-01-31") %>%
   group_by(ReportedWeekStart, `Day of Week`, AMorPM) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -29,14 +29,14 @@ plot_ly(x = ~`Day of Week`,
         color = ~AMorPM,
       #  boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Dec 13",
+layout(title = "Number of Cases Reported Each Day, by Day of Week and Time of Day Since Jan 31",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
 
 PHtracking %>%
   mutate("Day of Week" = wday(ReportedDate, label = TRUE), AMorPM = case_when(hour(ReportedDate)<=12 ~ "AM",
                                                                 hour(ReportedDate)>12 ~ "PM")) %>%
-  filter(ReportedWeekStart>="2021-12-13") %>%
+  filter(ReportedWeekStart>="2022-01-31") %>%
   group_by(ReportedWeekStart, `Day of Week`) %>%
   count() %>%
 plot_ly(x = ~`Day of Week`,
@@ -44,9 +44,29 @@ plot_ly(x = ~`Day of Week`,
         type = 'box',
        # boxpoints = "all",
         jitter = 0) %>%
-layout(title = "Number of Cases Reported Each Day, by Day of Week Since Dec 13",
+layout(title = "Number of Cases Reported Each Day, by Day of Week Since Jan 31",
        boxmode = "group",
        font = list(family = "Arial", size = 12))
+
+#median number cases per day, total and priority (<=18, >=70, hospitalized)
+ConfProbCases %>%
+  mutate("Day of Week" = wday(reporteddate, label = TRUE),
+         Priority = case_when(age_at_reported<19|age_at_reported>69 ~ "Y",
+                              hospitalized==TRUE ~ "Y",
+                              TRUE ~ as.character("N"))) %>%
+  filter(ReportedWeekStart>="2022-02-14") %>%
+  group_by(ReportedWeekStart, `Day of Week`, Priority) %>%
+  count() %>%
+  plot_ly(x = ~`Day of Week`,
+          y = ~n,
+          type = 'box',
+          color = ~Priority,
+          #  boxpoints = "all",
+          jitter = 0) %>%
+  layout(title = "Number of Cases Reported Each Day, by Priotrity and Day of Week Since Feb 14",
+         boxmode = "group",
+         font = list(family = "Arial", size = 12))
+
 
 
 ```

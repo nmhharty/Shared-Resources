@@ -13,9 +13,10 @@ output:
 ---
 
 ## Incidence: Daily and 14-Day Rolling Average, Calculated Daily  
-**NOTE:** Cases are attributed to a date based upon test collection date, for those who have a test collection date. For those with missing test collection dates, the report date is used.   
+**NOTE:** Cases are attributed to a date based upon test collection date, for those who have a test collection date. For those with missing test collection dates, the report date is used.
+**NOTE:** Beginning March 1, 2022, RCPH no longer investigates all cases of COVID-19. Due to this change in case investigation and the increased use of at-home tests, case counts after March 1, 2022 are an undercount of total cases and caution is necessary in making comparisons over time.  
 
-```{r label=RollingIncidence14day, eval=params$Internal}
+```{r label=RollingIncidence14day}
 plot_ly(ConfProbCases %>%
                     group_by(AttributionDate) %>%
                     summarise(NumberCases = n()) %>%
@@ -38,19 +39,11 @@ plot_ly(ConfProbCases %>%
                       autotick = F, 
                       tickangle = 45,
                       tick0 = "2000-01-10",
-                      dtick = 1209600000,
+                      dtick = 1814400000,
                       title = "Date (all listed dates are Mondays)",
                       showgrid = FALSE),
          yaxis = list(title = "14-day Rolling Sum",
                       showgrid = FALSE),
-         # yaxis2 = list(
-         #   tickfont = list(color = "#4E2B1F"),
-         #   overlaying = "y",
-         #   side = "right",
-         #   showgrid = FALSE,
-         #   title = "14-day Rolling Sum",
-         #   rangemode = "tozero",
-         #   range = c(0,588)),
          legend = list(orientation = 'h', y=-.3),
          font = list(family = "Arial", size = 12),
           annotations = list(
@@ -60,11 +53,28 @@ plot_ly(ConfProbCases %>%
                 xref = "paper",
                 yref = 'paper',
                 showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray")),
+           list(x = "2022-03-01",
+                y = .75,
+                text = "Universal Case Investigation Stopped.<br>Data is an undercount after March 1, 2022.",
+                showarrow = TRUE,
+                arrowhead = .5,
+                ax = -115,
+                ay = -100,
+                xref = "x",
+                yref = 'paper',
+                showarrow = FALSE,
                 font = list(family = "Arial", size = 12, color = "gray"))
-            )
+              ),
+         shapes = list(list(type = "rect",
+                    fillcolor = 'rgb(187, 70, 40)', line = list(color = 'rgb(187, 70, 40)'), opacity = 0.4,
+                    x0 = "2022-03-01", x1 = params$DataThroughDate, xref = "x",
+                    y0 = 0, y1 = 1, yref = "paper"))
          )
+
+
 ```
-```{r label=NumberCasesperDay14day}
+```{r label=NumberCasesperDay14day, eval = params$Internal}
 plot_ly(ConfProbCases %>%
           filter(#CountsTowardTotal=="Yes", 
                  AttributionDate<=(params$DataThroughDate)) %>%
@@ -97,7 +107,7 @@ add_trace(data = (ConfProbCases %>%
                       autotick = F, 
                       tickangle = 45,
                       tick0 = "2000-01-10",
-                      dtick = 1209600000,
+                      dtick = 1814400000,
                       title = "Date (all listed dates are Mondays)"),
          yaxis = list(title = "Number of Cases",
                       showgrid = FALSE,

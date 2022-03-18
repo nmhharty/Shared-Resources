@@ -1,6 +1,6 @@
 #Script to load and clean vaccination data for dashboard
 #First authored 2/2/2021 by Nicole Harty
-#Last update: 11/16/2021
+#Last update: 3/2/2022
 
 
 # Creating Population Level Vax Dataframes --------------------------------
@@ -149,7 +149,10 @@ FullyVax <- PtIZ %>%
 
 # Boosters and Third Doses ------------------------------------------------
 
-#all in RMD file
+#all analysis in RMD file
+
+
+
 
 # Queries - not run -------------------------------------------------------
 

@@ -12,7 +12,7 @@ library(openxlsx)
 
 # TestsRawCSV <- read.csv("COVID-Data-Files/CEDRS_COVIDELRTests.csv", skip = 3)
 # CasesRawXLSX <- read.xlsx("../Shared-Resources/COVID-Data-Files/CEDRS_NovelCoronavirusListing.xlsx", startRow = 4)
-variantData <- TestsRaw <- read.delim("../Shared-Resources/COVID-Data-Files/elr_variant_tests_Routt.txt", sep = "|")
+variantData <- read.delim("../Shared-Resources/COVID-Data-Files/elr_variant_tests_Routt.txt", sep = "|")
 TestsRaw <- read.delim("../Shared-Resources/COVID-Data-Files/elr_tests_Routt.txt", sep = "|")
 CasesRaw <- read.delim("../Shared-Resources/COVID-Data-Files/cedrs_Routt.txt", sep = "|")
 

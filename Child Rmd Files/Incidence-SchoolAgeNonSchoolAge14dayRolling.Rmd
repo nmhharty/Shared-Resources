@@ -60,7 +60,7 @@ add_trace(data = (ConfProbCases %>%
                       autotick = F, 
                       tickangle = 45,
                       tick0 = "2000-01-10",
-                      dtick = 1209600000,
+                      dtick = 1814400000,
                       title = "Date (all listed dates are Mondays)",
                       showgrid = FALSE),
          yaxis = list(title = "14-day Rolling Incidence Rate per 100,000",

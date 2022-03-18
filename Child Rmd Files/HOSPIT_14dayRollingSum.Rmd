@@ -1,0 +1,100 @@
+---
+title: "Hospitalizations: 14-day Rolling Sum"
+author:
+- name: Nicole Harty, MPH
+  affiliation: Epidemiologist/Data Manager
+date: "`r format(Sys.time(), '%B %d, %Y, %I %p')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    css: template.css
+---
+
+## Hospitalizations: 14-Day Rolling Sum of Hospitalizations
+
+
+```{r label = Hospit14day}
+#one line for ROUTT RESIDENTS hospitalized anywhere (disease severity)
+#one line for COVID hospitalizations at YVMC (hospital capacity)
+#one line for incidence
+
+plot_ly(COPHS %>%
+          select(HospitDate = Hospital.Admission.Date...MM.DD.YYYY., PersonID) %>%
+          group_by(HospitDate) %>%
+          summarise(NumberHospitROUTT = n()) %>%
+          right_join(Calendar, by = c("HospitDate" = "date")) %>%
+          replace(., is.na(.), 0) %>%
+          arrange(HospitDate) %>%
+          filter(HospitDate<=(params$DataThroughDate)) %>%
+          mutate(Hospit14daROUTT = zoo::rollsumr(NumberHospitROUTT, k = 14, fill = NA)),
+  x = ~HospitDate,
+  y = ~Hospit14daROUTT,
+  type = "scatter",
+  mode = "lines",
+  color = I("#BB4628"),
+  name = "Routt Resident Hospitalizations, Any Hospital") %>%
+add_trace(data = (Hospit %>%
+                    filter(Hospital.Name=="Yampa Valley Medical Center") %>%
+                    group_by(Hospital.Admission.Date) %>%
+                    summarise(NumberHospitYVMC = n()) %>%
+                    right_join(Calendar, by = c("Hospital.Admission.Date" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(Hospital.Admission.Date) %>%
+                    filter(Hospital.Admission.Date<=(params$DataThroughDate)) %>%
+                    mutate(Hospit14daYVMC = zoo::rollsumr(NumberHospitYVMC, k = 14, fill = NA))),
+          x = ~Hospital.Admission.Date,
+          y = ~Hospit14daYVMC,
+          type = "scatter",
+          color = I("#4E2B1F"),
+          mode = "lines",
+          name = "YVMC Hospitalizations, Any Residency") %>%
+add_trace(data = (ConfProbCases %>%
+                    group_by(AttributionDate) %>%
+                    summarise(NumberCases = n()) %>%
+                    right_join(Calendar, by = c("AttributionDate" = "date")) %>%
+                    replace(., is.na(.), 0) %>%
+                    arrange(AttributionDate) %>%
+                    filter(AttributionDate<=(params$DataThroughDate)) %>%
+                    mutate(Case14da = zoo::rollsumr(NumberCases, k = 14, fill = NA))),
+          x = ~AttributionDate,
+          y = ~Case14da,
+          type = "scatter",
+          color = I("#F2BF4C"),
+          mode = "lines",
+          yaxis = "y2",
+          name = "Rolling 14-day Sum Cases by Specimen Collection Date") %>%
+  layout(#title = "14-day Rolling Sum of Routt Resident Hospitalizations and YVMC Hospitalizations",
+          margin = list(l=50,r=50,h=175),
+         xaxis = list(type = 'date',
+                      tickformat = "%b %d, %Y",
+                      autotick = F, 
+                      tickangle = 45,
+                      tick0 = "2000-01-10",
+                      dtick = 1814400000,
+                      title = "Date (all listed dates are Mondays)",
+                      showgrid = FALSE),
+         yaxis = list(title = "Number of Admissions",
+                      showgrid = FALSE,
+           rangemode = "tozero"),
+        yaxis2 = list(
+           overlaying = "y",
+           side = "right",
+           showgrid = FALSE,
+           title = "14-day Rolling Incidence",
+           rangemode = "tozero"),
+         legend = list(orientation = 'h', y=-.3),
+         font = list(family = "Arial", size = 12),
+         annotations = list(
+           list(x = .0,
+                y2 = .5,
+                text = "Data prepared by Routt County Public Health",
+                xref = "paper",
+                yref = 'paper',
+                showarrow = FALSE,
+                font = list(family = "Arial", size = 12, color = "gray"))
+            )
+         )
+```
+
