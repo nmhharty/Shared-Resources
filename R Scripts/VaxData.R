@@ -1,12 +1,13 @@
 #Script to load and clean vaccination data for dashboard
 #First authored 2/2/2021 by Nicole Harty
-#Last update: 3/2/2022
+#Last update: 4/15/2022
 
+#4/15/2022: dosage_num column was removed from PatientImmunizations.txt file so need to modify analysis to NOT use this column 
 
 # Creating Population Level Vax Dataframes --------------------------------
 
 
-#load Dosage Report from CIIS
+#load Dosage Report from CIIS, PatientImmunizations from lpha portal
 ##Has ZIP code, age at receipt, vaccine name, dose #
 
 library(openxlsx)
@@ -49,9 +50,19 @@ PtIZ %>%
 
 #Need to update Fully Vax to label subsequent doses (>2 as fully vax)
 
+#As of 4/14/2022 dosage_num column removed from PatientImmunizations file so need to identify FullyVax using date of dose and type of dose
+
+#create dose_order column to identify order of vaccines received based upon date, regardless of vaccine type
+PtIZ <- PtIZ %>%
+  arrange(patient_id, vaccination_date) %>%
+  group_by(patient_id) %>%
+  mutate(DoseRank = rank(vaccination_date)) 
+
 PtIZ <- PtIZ %>% 
+  ungroup() %>%
   mutate(FullyVax = case_when(vaccination_code=="COVID-19 Vector-NR (JSN)" ~ "Yes",
-                              vaccination_code!="COVID-19 Vector-NR (JSN)"&dosage_num==2 ~ "Yes",
+                            #  vaccination_code!="COVID-19 Vector-NR (JSN)"&dosage_num==2 ~ "Yes", #remove this when dosage_num removed
+                              vaccination_code!="COVID-19 Vector-NR (JSN)"&DoseRank==2 ~ "Yes",
                               TRUE ~ as.character("No")),
          zip = str_sub(zip_code,1,5)) %>%
   mutate(City = case_when(zip %in% c("80477", "80487", "80488") ~ "Steamboat Springs",
@@ -64,6 +75,7 @@ PtIZ <- PtIZ %>%
                                    TRUE ~ as.character("Incomplete or Missing")),
          DoseDateWeek = isoweek(vaccination_date), 
          DoseDateWeekStart = floor_date(vaccination_date, "week", week_start = getOption("lubridate.week.start", 1)))
+
 FullyVax <- PtIZ %>%
   filter(FullyVax=="Yes") %>%
   select(patient_id, vaccination_date) %>%
@@ -149,9 +161,57 @@ FullyVax <- PtIZ %>%
 
 # Boosters and Third Doses ------------------------------------------------
 
-#all analysis in RMD file
+#identify booster recipients
 
+#identify J&J, MOD, and PFZ recipients
+JJrecipient <- PtIZ %>%
+  filter(vaccination_code=="COVID-19 Vector-NR (JSN)"&DoseRank==1)
 
+MODrecipient <- PtIZ %>%
+  filter(vaccination_code=="COVID-19 mRNA (MOD)"&DoseRank==1) %>%
+  select(patient_id) %>%
+  left_join(PtIZ %>%
+              filter(vaccination_code=="COVID-19 mRNA (MOD)"&DoseRank==2), by = "patient_id")
+
+PFZrecipient <- PtIZ %>%
+  filter((vaccination_code=="COVID 12+yrs PURPLE CAP"|vaccination_code=="COVID 12+yrs GRAY CAP"|
+            vaccination_code=="COVID AGE 5-11 ORANGE CAP")&DoseRank==1) %>%
+  select(patient_id) %>%
+  left_join(PtIZ %>%
+              filter((vaccination_code=="COVID 12+yrs PURPLE CAP"|vaccination_code=="COVID 12+yrs GRAY CAP"|
+                        vaccination_code=="COVID AGE 5-11 ORANGE CAP")&DoseRank==2), by = "patient_id")
+
+#For each first dose type, identify those who received 1st booster, 2nd booster
+#this doesn't account for time between doses, merely looks at DoseRank. previous analysis suggests very low rate of "bad data" or incorrect schedule
+JJrecipient <- JJrecipient %>%
+  select(patient_id) %>%
+  left_join(PtIZ, by = "patient_id") %>%
+  mutate(FirstBooster = case_when(DoseRank==2 ~ "TRUE",
+                                  TRUE ~ as.character("FALSE")),
+         SecondBooster = case_when(DoseRank==3 ~ "TRUE",
+                                  TRUE ~ as.character("FALSE")))
+
+MODrecipient <- MODrecipient %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id) %>%
+  left_join(PtIZ, by = "patient_id") %>%
+  mutate(FirstBooster = case_when(DoseRank==3 ~ "TRUE",
+                                  TRUE ~ as.character("FALSE")),
+         SecondBooster = case_when(DoseRank==4 ~ "TRUE",
+                                   TRUE ~ as.character("FALSE")))
+
+PFZrecipient <- PFZrecipient %>%
+  filter(FullyVax=="Yes") %>%
+  select(patient_id) %>%
+  left_join(PtIZ , by = "patient_id") %>%
+  mutate(FirstBooster = case_when(DoseRank==3 ~ "TRUE",
+                                  TRUE ~ as.character("FALSE")),
+         SecondBooster = case_when(DoseRank==4 ~ "TRUE",
+                                   TRUE ~ as.character("FALSE")))
+
+BoosterList <- JJrecipient %>%
+  rbind(MODrecipient) %>%
+  rbind(PFZrecipient)
 
 
 # Queries - not run -------------------------------------------------------

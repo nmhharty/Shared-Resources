@@ -15,13 +15,13 @@ output:
 ### Overall Vaccination Rates by Age  
 |Metric|Number|Percent|
 |-----|------|-----|
-|Routt Residents (All Ages) Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1) %>% distinct(patient_id) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1) %>% distinct(patient_id) %>% count() %>% pull())/params$RouttPop)`|
+|Routt Residents (All Ages) Received at Least 1 Dose|`r PtIZ %>% distinct(patient_id) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% distinct(patient_id) %>% count() %>% pull())/params$RouttPop)`|
 |Routt Residents (All Ages) Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes") %>% distinct(patient_id) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% distinct(patient_id) %>% count() %>% pull())/params$RouttPop)`|
-|Routt Residents 12+ Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>% distinct(patient_id) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>11) %>% distinct(patient_id) %>% count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents 12+ Received at Least 1 Dose|`r PtIZ %>% filter(age_at_1stvaccination>11) %>% distinct(patient_id) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(age_at_1stvaccination>11) %>% distinct(patient_id) %>% count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
 |Routt Residents 12+ Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>% distinct(patient_id) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>11) %>% distinct(patient_id) %>%count() %>% pull())/(RouttPopTable2 %>% filter(AGE>11) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
-|Routt Residents Ages 5-11 Received at Least 1 Dose|`r PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(dosage_num==1, age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>4,AGE<12) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
+|Routt Residents Ages 5-11 Received at Least 1 Dose|`r PtIZ %>% filter(age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>%  count() %>% pull()`|`r scales::percent((PtIZ %>% filter(age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>4,AGE<12) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|
 |Routt Residents Ages 5-11 Completed Vaccine Series|`r PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>% count() %>% pull()`|`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>4, age_at_1stvaccination<12) %>% distinct(patient_id) %>%  count() %>% pull())/(RouttPopTable2 %>% filter(AGE>4,AGE<12) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`|  
-|Routt Residents (All Ages) Received Booster Dose|`r ((PtIZ %>% filter(dosage_num==3) %>%  count())+(PtIZ %>% filter(vaccination_code=="COVID-19 Vector-NR (JSN)") %>% select(patient_id) %>% distinct() %>% left_join(PtIZ %>% select(patient_id, vaccination_code, dosage_num, vaccination_date), by = "patient_id") %>% filter(vaccination_code!="COVID-19 Vector-NR (JSN)") %>% count())) %>% pull()`|`r scales::percent((((PtIZ %>% filter(dosage_num==3) %>%  count())+(PtIZ %>% filter(vaccination_code=="COVID-19 Vector-NR (JSN)") %>% select(patient_id) %>% distinct() %>% left_join(PtIZ %>%            select(patient_id, vaccination_code, dosage_num, vaccination_date), by = "patient_id") %>% filter(vaccination_code!="COVID-19 Vector-NR (JSN)") %>% count()))/params$RouttPop) %>% pull())`|
+|Routt Residents (All Ages) Received Booster Dose|`r BoosterList %>% filter(FirstBooster=="TRUE") %>% count() %>% pull()`|`r scales::percent(((BoosterList %>% filter(FirstBooster=="TRUE") %>% count() %>% pull())/params$RouttPop))`|
 
 <!-- This table provides percentages both using the entire Routt County population as the denominator (first two rows) and the population aged 16 and older as the denominator (last two rows). As of May 12, 2021, individuals 12 to 15 years are eligible to receive a COVID-19 vaccine. Routt's Road to Recovery set a goal of 75% of county residents 16 and older completing the vaccination series, so this table includes both a percentage of all residents as well as a percentage of residents 16 and older.   
 Routt County's most vulnerable, those age 70+, have good vaccine protection with **`r scales::percent((PtIZ %>% filter(FullyVax=="Yes", age_at_1stvaccination>69) %>% distinct(patient_id) %>%  count() %>% pull())/(RouttPopTable %>% filter(AgeGroup10yr %in% c("70-79", "80-89", "90 and over")) %>% summarise(TotalPop=sum(TOTAL))) %>% pull())`** of Routt County's 70+ population having completed the vaccine series.  
@@ -95,8 +95,16 @@ PtIZ %>%
                select(City, `Percent Completed Vaccination Series`)), by = "City") %>%
   filter(City!="Incomplete or Missing") %>%
   add_row(City = "Routt County Overall", 
-          `Percent Received At Least One Dose` = scales::percent((PtIZ %>% filter(dosage_num==1) %>% distinct(patient_id) %>% count() %>% pull())/params$RouttPop),
-          `Percent Completed Vaccination Series` = scales::percent((PtIZ %>% filter(FullyVax=="Yes") %>% count() %>% pull())/params$RouttPop)) %>%
+          `Percent Received At Least One Dose` = scales::percent((PtIZ %>% 
+                                                                  #  filter(dosage_num==1) %>% #removed when dosage_num column removed
+                                                                    filter(DoseRank==1) %>% #added when dosage_num column removed
+                                                                    distinct(patient_id) %>% 
+                                                                    count() %>% 
+                                                                    pull())/params$RouttPop),
+          `Percent Completed Vaccination Series` = scales::percent((PtIZ %>% 
+                                                                      filter(FullyVax=="Yes") %>% 
+                                                                      count() %>% 
+                                                                      pull())/params$RouttPop)) %>%
   kable(caption = "Estimated Vaccination Rate by Region")
 
 ```
