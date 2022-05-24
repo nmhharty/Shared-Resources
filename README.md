@@ -50,7 +50,7 @@ This folder contains all the images of the CDPHE Dial Framework that were includ
 This folder contains all non-CDPHE Dial Framework images used on the dashboard.  
 - RouttPHlogo  
 
-## R Scrips
+## R Scripts
 This folder contains all the R scripts used for data import, cleaning, and initial analysis. These scripts are sourced by Rmd files to prepare all data used in the dashboard.  
  - CalendarTable.R: creates a calendar table for reference  
  - CompareELR.R: used to diagnose and troubleshoot differences in two ELR source files  
