@@ -1,5 +1,5 @@
 # Shared-Resources
-R scripts, child Rmd, images used by variety of COVID projects
+R scripts, child Rmd, images used by variety of COVID projects  
 This repositroy contains directories for child Rmd files, R scripts, and images necessary to create both public and internal COVID dashboards for Routt County Public Health. Regular pushes include updates to data cleaning scripts or child RmD files.
 
 # Folders and Files   
